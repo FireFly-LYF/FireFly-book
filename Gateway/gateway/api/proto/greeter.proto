@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+// 逻辑包名，影响生成的 Go 包路径与 full method 前缀
+package gateway;
+
+// 必须与 go.mod module 一致：gateway/internal/pb
+option go_package = "gateway/internal/pb;pb";
+
+// Greeter 演示服务：与 HTTP 下游 /user 类似，用于验证 LB
+service UserService {
+  // Unary RPC：一个 HelloRequest → 一个 HelloReply
+  rpc Greet  (HelloRequest) returns (HelloReply);
+
+  // 可选：Server streaming，进阶时在 downstream 实现
+  // rpc SayHelloStream (HelloRequest) returns (stream HelloReply);
+}
+
+message HelloRequest {
+  string name = 1; // 字段编号 1，不可随意改（兼容性）
+}
+
+message HelloReply {
+  string message = 1;
+  string instance = 2; // 下游端口标识，便于观察 LB，类似 HTTP 的 instance 字段
+}

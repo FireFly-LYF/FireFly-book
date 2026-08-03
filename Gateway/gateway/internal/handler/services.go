@@ -1,0 +1,75 @@
+package handler
+
+import (
+	"errors"
+
+	"gateway/internal/registry"
+	"gateway/internal/upstream"
+
+	"github.com/gin-gonic/gin"
+)
+
+// ListServices 返回所有下游节点（含 unhealthy），供运维查看。
+func (g *Gateway) ListServices(c *gin.Context) {
+	c.JSON(200, gin.H{"code": 0, "msg": "ok", "data": g.reg.List()})
+}
+
+// RegisterService 动态注册下游；http / grpc / tcp / addr 至少填一项。
+func (g *Gateway) RegisterService(c *gin.Context) {
+	var req struct {
+		HTTP   string `json:"http"`
+		GRPC   string `json:"grpc"`
+		TCP    string `json:"tcp"`
+		Addr   string `json:"addr"`
+		Weight int    `json:"weight"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"code": 400, "msg": "bad request"})
+		return
+	}
+	ep, err := upstream.Normalize(req.HTTP, req.GRPC, req.TCP, req.Addr, req.Weight)
+	if err != nil {
+		c.JSON(400, gin.H{"code": 400, "msg": err.Error()})
+		return
+	}
+	if err := g.reg.Register(ep); err != nil {
+		if errors.Is(err, registry.ErrDuplicate) {
+			c.JSON(409, gin.H{"code": 409, "msg": err.Error()})
+			return
+		}
+		c.JSON(500, gin.H{"code": 500, "msg": err.Error()})
+		return
+	}
+	registry.Sync(g.reg, g.balancers)
+	c.JSON(200, gin.H{"code": 0, "msg": "ok", "data": gin.H{"id": ep.ID}})
+}
+
+// DeregisterService 按节点 id 下线；兼容 http 字段（与 id 等价）。
+func (g *Gateway) DeregisterService(c *gin.Context) {
+	var req struct {
+		ID   string `json:"id"`
+		HTTP string `json:"http"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"code": 400, "msg": "bad request"})
+		return
+	}
+	id := req.ID
+	if id == "" {
+		id = req.HTTP
+	}
+	if id == "" {
+		c.JSON(400, gin.H{"code": 400, "msg": "id or http required"})
+		return
+	}
+	if err := g.reg.Deregister(id); err != nil {
+		if errors.Is(err, registry.ErrNotFound) {
+			c.JSON(404, gin.H{"code": 404, "msg": err.Error()})
+			return
+		}
+		c.JSON(500, gin.H{"code": 500, "msg": err.Error()})
+		return
+	}
+	registry.Sync(g.reg, g.balancers)
+	c.JSON(200, gin.H{"code": 0, "msg": "ok"})
+}

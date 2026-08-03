@@ -1,0 +1,24 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.format.settings.url": "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml",
+  "java.format.settings.profile": "GoogleStyle",
+  "java.saveActions.organizeImports": true,
+  "java.inlayHints.parameterNames.enabled": "all",
+  "java.server.launchMode": "Standard",
+  "spring-boot.ls.problem.application-properties.enabled": true,
+  "spring-boot.ls.problem.application-yaml.enabled": true,
+  "files.exclude": {
+    "**/.classpath": true,
+    "**/.project": true,
+    "**/.settings": true,
+    "**/.factorypath": true
+  },
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-21",
+      "path": "D:\\A_Software\\Java\\JDK21",
+      "default": true
+    }
+  ]
+}

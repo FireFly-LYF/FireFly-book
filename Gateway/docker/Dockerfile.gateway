@@ -1,0 +1,38 @@
+# 网关镜像：Vue Admin 静态资源 + Go 三协议网关
+# 构建：docker compose build gateway
+
+# ---------- 阶段 1：打包 Admin ----------
+#以 node:22-alpine 为基础镜像，本阶段命名为 admin-builder
+FROM node:22-alpine AS admin-builder
+#在镜像内创建并切换到 /app
+WORKDIR /app
+#将 admin 目录下的 package.json 和 package-lock.json 复制到镜像内的 /app 目录
+COPY admin/package.json admin/package-lock.json ./
+#安装 admin 项目的依赖
+RUN npm ci
+COPY admin/ .
+RUN npm run build
+
+# ---------- 阶段 2：编译 Go 网关 ----------
+FROM golang:1.25-alpine AS go-builder
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOTOOLCHAIN=local
+WORKDIR /src
+#将 gateway/ 目录下的这两个依赖文件，复制到容器内当前工作目录下。
+COPY gateway/go.mod gateway/go.sum ./
+RUN go mod download
+#复制整个 gateway/ 源码到 /src/
+COPY gateway/ .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /gateway ./cmd/gateway
+
+# ---------- 阶段 3：运行镜像 ----------
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates
+
+#当前阶段（nginx:alpine）的镜像中没有 /app/dist 这个路径
+COPY --from=go-builder /gateway /usr/local/bin/gateway
+COPY --from=admin-builder /app/dist /app/admin
+COPY gateway/internal/config/docker.yaml /etc/gateway/gateway.yaml
+
+EXPOSE 8080 50051 8081
+ENTRYPOINT ["gateway", "-config", "/etc/gateway/gateway.yaml"]

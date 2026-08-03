@@ -1,0 +1,12 @@
+.git
+.vscode
+docs
+**/.git
+**/node_modules
+**/dist
+**/__debug_bin*
+gateway/gateway
+*.exe
+*.log
+.env
+.env.*

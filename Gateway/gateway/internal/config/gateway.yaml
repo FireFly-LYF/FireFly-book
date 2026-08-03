@@ -1,0 +1,53 @@
+# Gateway 配置文件
+# 启动：在 gateway 目录下执行 go run ./cmd/gateway
+
+server:
+  addr: ":8080"
+
+grpc:
+  listen: ""
+  auth_required: true   # false 则跳过 metadata JWT（仅开发）
+
+tcp:
+  listen: ""
+
+jwt:
+  secret: "phase3-dev-secret-change-me"
+  token_ttl: "24h"
+
+tenants:
+  - tenant-a
+  - tenant-b
+
+redis:
+  addr: "localhost:6379"
+
+ratelimit:
+  rate:  100000
+  capacity: 100000
+  daily_limit: 100000000
+
+circuit_breaker:
+  threshold: 5
+  cooldown_sec: 30
+
+# 服务注册存储：memory=内存（默认）| mysql=MySQL 持久化
+registry:
+  type: memory   # 压测/本地无 MySQL 时用 memory；需要持久化再改回 mysql
+  dsn: "root:123456@tcp(localhost:3306)/gateway?parseTime=true"
+
+# 统一下游列表：memory 模式作初始节点；mysql 模式 DB 为空时也会 seed 写入
+loadbalancer:
+  strategy: round_robin
+  upstreams:
+    - http: http://localhost:9001
+      weight: 1
+    - grpc: localhost:50052
+      weight: 1
+    - tcp: localhost:9010
+      weight: 1
+
+security:
+  ip_blocklist:
+    - "192.168.1.99"
+    - "10.0.0.5"

@@ -1,0 +1,51 @@
+services:
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+      - "8081:8081"
+    #当前服务要等这 4 个依赖服务都满足“指定条件”后，才会启动
+    depends_on:
+      redis:
+        #必须等到 Redis 容器通过健康检查，当前服务才启动。
+        condition: service_healthy
+      downstream-http:
+        #只需要等该容器启动成功，当前服务就启动。
+        condition: service_started
+      downstream-grpc:
+        condition: service_started
+      downstream-tcp:
+        condition: service_started
+
+  downstream-http:
+    build:
+      #构建上下文指定为当前目录的上一层目录
+      context: ..
+      dockerfile: docker/Dockerfile.downstream-http
+    ports:
+      - "9001:9001"
+
+  downstream-grpc:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.downstream-grpc
+    ports:
+      - "50052:50052"
+
+  downstream-tcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.downstream-tcp
+    ports:
+      - "9010:9010"

@@ -1,0 +1,46 @@
+server:
+  addr: ":8080"
+
+grpc:
+  listen: ":50051"
+  auth_required: true
+
+tcp:
+  listen: ":8081"
+
+jwt:
+  secret: "phase3-dev-secret-change-me"
+  token_ttl: "24h"
+
+tenants:
+  - tenant-a
+  - tenant-b
+
+redis:
+  addr: "redis:6379"          # ← 改为 compose 服务名
+
+ratelimit:
+  rate: 5
+  capacity: 5
+  daily_limit: 10000
+
+circuit_breaker:
+  threshold: 5
+  cooldown_sec: 30
+
+registry:
+  type: mysql
+  dsn: "root:123456@tcp(mysql-gateway:3306)/gateway?parseTime=true"
+
+loadbalancer:
+  strategy: consistent_hash
+  upstreams:
+    - http: http://downstream-http:9001   # ← 容器服务名
+      weight: 1
+    - grpc: downstream-grpc:50052
+      weight: 1
+    - tcp: downstream-tcp:9010
+      weight: 1
+
+security:
+  ip_blocklist: []

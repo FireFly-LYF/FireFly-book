@@ -1,0 +1,109 @@
+# =========================
+# Go
+# =========================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/bin/
+/dist/
+/vendor/
+go.work
+go.work.sum
+
+# 本地编译产物（勿写 /gateway/downstream，会与 downstream/ 源码目录冲突）
+/gateway/gateway
+/gateway/gateway.exe
+/gateway/downstream.exe
+/gateway/downstream_*.exe
+/gateway/__debug_bin*
+/Gateway/gateway
+/Gateway/gateway.exe
+/Gateway/downstream.exe
+/Gateway/downstream_*.exe
+/Gateway/__debug_bin*
+
+# =========================
+# 配置与密钥（保留示例配置，忽略本地覆盖）
+# =========================
+.env
+.env.*
+!.env.example
+*.local.yaml
+*.local.yml
+config/*.local.*
+**/gateway.local.yaml
+
+# 临时测试数据
+_login.json
+
+# =========================
+# 日志与运行时
+# =========================
+*.log
+logs/
+/tmp/
+*.pid
+
+# =========================
+# IDE / 编辑器
+# =========================
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# =========================
+# 操作系统
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# 前端（Vue Admin）
+# =========================
+node_modules/
+dist/
+admin/node_modules/
+admin/dist/
+.nuxt/
+.output/
+*.tsbuildinfo
+
+# =========================
+# Java / Spring（若后续接入）
+# =========================
+target/
+*.class
+*.jar
+*.war
+*.ear
+.gradle/
+build/
+.settings/
+.classpath
+.project
+.factorypath
+
+# =========================
+# Docker / 部署
+# =========================
+docker-compose.override.yml
+*.override.yaml
+
+# =========================
+# 测试与覆盖率
+# =========================
+coverage/
+coverage.out
+coverage.html
+*.prof
+*.pprof
