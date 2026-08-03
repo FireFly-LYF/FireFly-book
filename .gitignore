@@ -1,0 +1,103 @@
+# =========================
+# FireFly-book 仓库根 .gitignore
+# 各服务/Gateway 可保留自己的 .gitignore；此处放跨项目通用规则
+# =========================
+
+# ----- 操作系统 -----
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# ----- IDE / 编辑器 -----
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+.classpath
+.project
+.factorypath
+.settings/
+.apt_generated
+.springBeans
+.sts4-cache
+
+# ----- 密钥与本地配置 -----
+.env
+.env.*
+!.env.example
+*.local.properties
+*.local.yml
+*.local.yaml
+**/application-local.properties
+**/application-local.yml
+credentials.json
+*.pem
+*.p12
+*.jks
+
+# ----- 日志与临时文件 -----
+*.log
+logs/
+tmp/
+temp/
+*.pid
+*.bak
+*.tmp
+
+# ----- Java / Maven / Gradle（所有微服务） -----
+**/target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+.mvn/wrapper/maven-wrapper.jar
+.gradle/
+**/build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ----- Node / 前端 -----
+node_modules/
+dist/
+.nuxt/
+.output/
+*.tsbuildinfo
+
+# ----- Go（若根仓一并纳入） -----
+*.exe
+*.exe~
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
+
+# ----- Docker / 本地覆盖 -----
+docker-compose.override.yml
+*.override.yaml
+
+# ----- 测试覆盖率 -----
+coverage/
+coverage.out
+coverage.html
+*.prof
+*.pprof
+
+# ----- 压缩包与杂物 -----
+*.zip
+*.tar.gz
+*.rar
+.cursor/

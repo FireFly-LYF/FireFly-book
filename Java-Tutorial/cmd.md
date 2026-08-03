@@ -1,0 +1,16 @@
+*创建项目*
+
+curl.exe -o user.zip "https://start.spring.io/starter.zip?type=maven-project&language=java&bootVersion=4.1.0&baseDir=user-service&groupId=com.firefly&artifactId=user-service&name=user-service&packageName=com.firefly.userservice&javaVersion=17&dependencies=web"
+
+Expand-Archive -Path user.zip -DestinationPath . -Force
+
+Remove-Item user.zip
+
+
+
+*快速编译运行（必须在 hello-service 目录下）*
+
+cd d:\A_Software\Java\SAVE\FireFly-book\services\hello-service
+
+mvn spring-boot:run
+
