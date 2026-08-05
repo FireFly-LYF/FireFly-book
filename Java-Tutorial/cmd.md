@@ -1,6 +1,6 @@
 *创建项目*
 
-curl.exe -o user.zip "https://start.spring.io/starter.zip?type=maven-project&language=java&bootVersion=4.1.0&baseDir=user-service&groupId=com.firefly&artifactId=user-service&name=user-service&packageName=com.firefly.userservice&javaVersion=17&dependencies=web"
+curl.exe -o user.zip "https://start.spring.io/starter.zip?type=maven-project&language=java&bootVersion=4.1.0&baseDir=user-service&groupId=com.firefly&artifactId=user-service&name=user-service&packageName=userservice&javaVersion=17&dependencies=web"
 
 Expand-Archive -Path user.zip -DestinationPath . -Force
 

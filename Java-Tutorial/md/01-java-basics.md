@@ -97,15 +97,15 @@ public class Calculator {
 项目一大，类要分目录。第一行常写：
 
 ```java
-package com.firefly.user.controller;
+package userservice.controller;
 ```
 
-对应文件夹大致是：`src/main/java/com/firefly/user/controller/`。
+对应文件夹大致是：`src/main/java/userservice/controller/`。
 
 别的文件要用这个类时：
 
 ```java
-import com.firefly.user.controller.UserController;
+import userservice.controller.UserController;
 ```
 
 Spring 项目里包名你会经常看到，记住：**包名 ↔ 文件夹路径** 即可。

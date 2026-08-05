@@ -75,7 +75,7 @@ spring:
 mybatis:
   configuration:
     map-underscore-to-camel-case: true   # user_name ↔ userName
-  type-aliases-package: com.firefly.user.entity
+  type-aliases-package: userservice.entity
 ```
 
 密码务必改成你本机的。
@@ -85,7 +85,7 @@ mybatis:
 ## 步骤 4：实体类 Entity
 
 ```java
-package com.firefly.user.entity;
+package userservice.entity;
 
 import java.time.LocalDateTime;
 
@@ -123,9 +123,9 @@ public class User {
 ## 步骤 5：Mapper 接口（注解 SQL，新手更直观）
 
 ```java
-package com.firefly.user.mapper;
+package userservice.mapper;
 
-import com.firefly.user.entity.User;
+import userservice.entity.User;
 import org.apache.ibatis.annotations.*;
 
 @Mapper
@@ -146,7 +146,7 @@ public interface UserMapper {
 
 启动类上确保能扫到 Mapper，二选一：
 
-- 启动类加 `@MapperScan("com.firefly.user.mapper")`
+- 启动类加 `@MapperScan("userservice.mapper")`
 - 或每个 Mapper 已有 `@Mapper`（通常够用）
 
 ---
@@ -154,10 +154,10 @@ public interface UserMapper {
 ## 步骤 6：改造 Service 用数据库
 
 ```java
-package com.firefly.user.service;
+package userservice.service;
 
-import com.firefly.user.entity.User;
-import com.firefly.user.mapper.UserMapper;
+import userservice.entity.User;
+import userservice.mapper.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 

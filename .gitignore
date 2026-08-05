@@ -54,8 +54,7 @@ temp/
 
 # ----- Java / Maven / Gradle（所有微服务） -----
 **/target/
-!**/src/main/**/target/
-!**/src/test/**/target/
+**/out/
 *.class
 *.jar
 *.war

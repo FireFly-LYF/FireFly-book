@@ -1,4 +1,4 @@
-package com.firefly.userservice;
+package userservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
