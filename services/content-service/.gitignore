@@ -1,8 +1,9 @@
+# content-service（与根 .gitignore 互补；本地 IDE / 构建产物）
+
 HELP.md
 target/
+out/
 .mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
 
 ### STS ###
 .apt_generated
@@ -26,8 +27,13 @@ target/
 /nbdist/
 /.nb-gradle/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
 ### VS Code ###
 .vscode/
+
+### 本地覆盖配置（密码等勿提交） ###
+*.local.properties
+*.local.yml
+*.local.yaml
+application-local.properties
+application-local.yml

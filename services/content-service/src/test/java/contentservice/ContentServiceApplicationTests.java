@@ -1,10 +1,10 @@
-package com.firefly.helloservice;
+package contentservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class HelloServiceApplicationTests {
+class ContentServiceApplicationTests {
 
 	@Test
 	void contextLoads() {

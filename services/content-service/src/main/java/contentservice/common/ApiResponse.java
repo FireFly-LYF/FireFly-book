@@ -1,4 +1,4 @@
-package com.firefly.helloservice.common;
+package contentservice.common;
 
 public class ApiResponse<T> {
     private int code;

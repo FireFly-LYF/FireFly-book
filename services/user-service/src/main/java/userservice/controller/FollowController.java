@@ -1,8 +1,11 @@
 package userservice.controller;
 
 import userservice.common.ApiResponse;
+import userservice.entity.User;
 import userservice.service.FollowService;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/user")
@@ -41,6 +44,24 @@ public class FollowController {
             return ApiResponse.ok(null);
         } catch (IllegalArgumentException e) {
             return ApiResponse.fail(40001, e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/followers")
+    public ApiResponse<List<User>> followers(@PathVariable Long id) {
+        try {
+            return ApiResponse.ok(followService.listFollowers(id));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.fail(40401, e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/following")
+    public ApiResponse<List<User>> following(@PathVariable Long id) {
+        try {
+            return ApiResponse.ok(followService.listFollowing(id));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.fail(40401, e.getMessage());
         }
     }
 }

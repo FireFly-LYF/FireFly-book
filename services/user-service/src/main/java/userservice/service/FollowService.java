@@ -1,8 +1,11 @@
 package userservice.service;
 
+import userservice.entity.User;
 import userservice.mapper.FollowMapper;
 import userservice.mapper.UserMapper;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class FollowService {
@@ -31,6 +34,22 @@ public class FollowService {
     public void unfollow(Long followerId, Long followeeId) {
         if (followMapper.delete(followerId, followeeId) == 0) {
             throw new IllegalArgumentException("未关注该用户");
+        }
+    }
+
+    public List<User> listFollowers(Long userId) {
+        requireUser(userId);
+        return followMapper.findFollowers(userId);
+    }
+
+    public List<User> listFollowing(Long userId) {
+        requireUser(userId);
+        return followMapper.findFollowing(userId);
+    }
+
+    private void requireUser(Long userId) {
+        if (userMapper.findById(userId) == null) {
+            throw new IllegalArgumentException("用户不存在");
         }
     }
 }
