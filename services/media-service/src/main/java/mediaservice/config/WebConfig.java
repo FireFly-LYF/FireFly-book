@@ -1,6 +1,5 @@
 package mediaservice.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -8,12 +7,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${media.storage-dir}")
-    private String storageDir;
+    private final MediaProperties mediaProperties;
+
+    public WebConfig(MediaProperties mediaProperties) {
+        this.mediaProperties = mediaProperties;
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String location = storageDir.replace("\\", "/");
+        String location = mediaProperties.getStorageDir().replace("\\", "/");
         if (!location.endsWith("/")) {
             location = location + "/";
         }

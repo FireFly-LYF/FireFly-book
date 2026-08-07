@@ -1,8 +1,8 @@
 package mediaservice.service;
 
+import mediaservice.config.MediaProperties;
 import mediaservice.entity.MediaAsset;
 import mediaservice.mapper.MediaAssetMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,15 +18,11 @@ import java.util.UUID;
 public class MediaService {
 
     private final MediaAssetMapper mediaAssetMapper;
+    private final MediaProperties mediaProperties;
 
-    @Value("${media.storage-dir}")
-    private String storageDir;
-
-    @Value("${media.public-base-url}")
-    private String publicBaseUrl;
-
-    public MediaService(MediaAssetMapper mediaAssetMapper) {
+    public MediaService(MediaAssetMapper mediaAssetMapper, MediaProperties mediaProperties) {
         this.mediaAssetMapper = mediaAssetMapper;
+        this.mediaProperties = mediaProperties;
     }
 
     public Map<String, Object> save(Long userId, MultipartFile file) {
@@ -46,13 +42,14 @@ public class MediaService {
         String filename = UUID.randomUUID() + ext;
 
         try {
-            Path dest = Paths.get(storageDir, filename);
+            Path dest = Paths.get(mediaProperties.getStorageDir(), filename);
             Files.createDirectories(dest.getParent());
             file.transferTo(dest);
         } catch (IOException e) {
             throw new IllegalStateException("保存文件失败: " + e.getMessage(), e);
         }
 
+        String publicBaseUrl = mediaProperties.getPublicBaseUrl();
         String base = publicBaseUrl.endsWith("/")
                 ? publicBaseUrl.substring(0, publicBaseUrl.length() - 1)
                 : publicBaseUrl;
