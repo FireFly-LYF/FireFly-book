@@ -1,0 +1,22 @@
+server:
+  port: 9003
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/media?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  type-aliases-package: mediaservice.entity
+
+media:
+  storage-dir: D:/FireFlyData/media
+  public-base-url: http://127.0.0.1:9003/files

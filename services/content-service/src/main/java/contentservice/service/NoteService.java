@@ -1,10 +1,14 @@
 package contentservice.service;
 
 import contentservice.dto.CreateNoteRequest;
+import contentservice.dto.NoteDetailResponse;
 import contentservice.dto.UpdateNoteRequest;
 import contentservice.entity.Note;
+import contentservice.entity.NoteMedia;
 import contentservice.mapper.NoteMapper;
+import contentservice.mapper.NoteMediaMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -12,12 +16,16 @@ import java.util.List;
 public class NoteService {
 
     private final NoteMapper noteMapper;
+    private final NoteMediaMapper noteMediaMapper;
 
-    public NoteService(NoteMapper noteMapper) {
+    public NoteService(NoteMapper noteMapper, NoteMediaMapper noteMediaMapper) {
         this.noteMapper = noteMapper;
+        this.noteMediaMapper = noteMediaMapper;
     }
 
-    public Note create(Long userId, CreateNoteRequest req) {
+    /** 发笔记：事务内写 note + note_media */
+    @Transactional
+    public NoteDetailResponse create(Long userId, CreateNoteRequest req) {
         Note n = new Note();
         n.setUserId(userId);
         n.setTitle(req.getTitle());
@@ -25,11 +33,31 @@ public class NoteService {
         n.setCoverUrl(req.getCoverUrl());
         n.setStatus(1); // 已发布
         noteMapper.insert(n);
-        return noteMapper.findById(n.getId());
+
+        List<String> urls = req.getMediaUrls();
+        if (urls != null) {
+            for (int i = 0; i < urls.size(); i++) {
+                NoteMedia m = new NoteMedia();
+                m.setNoteId(n.getId());
+                m.setMediaUrl(urls.get(i));
+                m.setSortNo(i);
+                noteMediaMapper.insert(m);
+            }
+        }
+        return toDetail(n.getId());
     }
 
     public Note findById(Long id) {
         return noteMapper.findById(id);
+    }
+
+    /** 详情：笔记 + 图片 URL 列表 */
+    public NoteDetailResponse findDetail(Long id) {
+        Note n = noteMapper.findById(id);
+        if (n == null) {
+            return null;
+        }
+        return toDetail(id);
     }
 
     public List<Note> listByUser(Long userId, int page, int size) {
@@ -58,9 +86,19 @@ public class NoteService {
         return noteMapper.findById(noteId);
     }
 
+    @Transactional
     public void delete(Long userId, Long noteId) {
         requireOwned(userId, noteId);
+        noteMediaMapper.deleteByNoteId(noteId);
         noteMapper.delete(noteId);
+    }
+
+    private NoteDetailResponse toDetail(Long noteId) {
+        NoteDetailResponse r = new NoteDetailResponse();
+        r.setNote(noteMapper.findById(noteId));
+        List<String> urls = noteMediaMapper.listUrlsByNoteId(noteId);
+        r.setMediaUrls(urls != null ? urls : List.of());
+        return r;
     }
 
     private Note requireOwned(Long userId, Long noteId) {

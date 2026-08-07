@@ -2,6 +2,7 @@ package contentservice.controller;
 
 import contentservice.common.ApiResponse;
 import contentservice.dto.CreateNoteRequest;
+import contentservice.dto.NoteDetailResponse;
 import contentservice.dto.UpdateNoteRequest;
 import contentservice.entity.Note;
 import contentservice.service.NoteService;
@@ -20,7 +21,7 @@ public class NoteController {
     }
 
     @PostMapping
-    public ApiResponse<Note> create(
+    public ApiResponse<NoteDetailResponse> create(
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
             @RequestBody CreateNoteRequest req) {
         if (userId == null) {
@@ -39,12 +40,12 @@ public class NoteController {
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Note> getById(@PathVariable Long id) {
-        Note n = noteService.findById(id);
-        if (n == null) {
+    public ApiResponse<NoteDetailResponse> getById(@PathVariable Long id) {
+        NoteDetailResponse detail = noteService.findDetail(id);
+        if (detail == null) {
             return ApiResponse.fail(40401, "笔记不存在");
         }
-        return ApiResponse.ok(n);
+        return ApiResponse.ok(detail);
     }
 
     @PutMapping("/{id}")
