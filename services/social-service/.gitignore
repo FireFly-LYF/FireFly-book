@@ -1,0 +1,39 @@
+# social-service（与根 .gitignore 互补；本地 IDE / 构建产物）
+
+HELP.md
+target/
+out/
+.mvn/wrapper/maven-wrapper.jar
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+
+### VS Code ###
+.vscode/
+
+### 本地覆盖配置（密码等勿提交） ###
+*.local.properties
+*.local.yml
+*.local.yaml
+application-local.properties
+application-local.yml

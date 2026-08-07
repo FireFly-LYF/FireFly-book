@@ -1,0 +1,16 @@
+server:
+  port: 9004
+
+spring:
+  application:
+    name: social-service
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/social?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  type-aliases-package: socialservice.entity
