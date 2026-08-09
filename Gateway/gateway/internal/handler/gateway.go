@@ -48,8 +48,15 @@ func (g *Gateway) Register(r *gin.Engine) {
 	admin.GET("/statistic", g.GetStatistics)
 	admin.GET("/statistics/report", g.GetStatisticsReport)
 
-	apiAuth := middleware.JWTAuth(g.cfg.JWTSecret())
-	if !g.cfg.APIAuthRequired() {
+	// 业务登录/注册公开；其余 /api 默认强制 JWT（jwt.api_required）
+	publicAPI := map[string]struct{}{
+		"POST /api/user/register": {},
+		"POST /api/user/login":    {},
+	}
+	var apiAuth gin.HandlerFunc
+	if g.cfg.APIAuthRequired() {
+		apiAuth = middleware.JWTAuthExcept(g.cfg.JWTSecret(), publicAPI)
+	} else {
 		apiAuth = middleware.OptionalJWTAuth(g.cfg.JWTSecret())
 	}
 

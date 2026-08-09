@@ -92,22 +92,17 @@ Controller 上的 `@RequestMapping` 已带 `/api/xxx` 时，网关转发时注�
 
 ---
 
-## 步骤 5：JWT 与登录怎么配合（推荐演进）
+## 步骤 5：JWT 与登录（已落地）
 
-### 阶段 1（现在）
+业务登录走 **user-service**，不要用 `/gateway/login`（那是 Admin 租户运维 Token）。
 
-- 注册登录在 user-service
-- 请求手工加 `X-User-Id`
-- 网关可先关掉严格鉴权或只用租户 JWT 做实验
+1. `POST /api/user/register` 或 `POST /api/user/login`（网关白名单，无需 Bearer）
+2. 响应：`{ "token": "...", "user": { ... } }`（user-service 用与网关相同的 `jwt.secret` 签发，claims 含 `uid`、`iss=tenant-a`）
+3. 后续请求：`Authorization: Bearer <token>`
+4. 网关验签后注入 `X-User-Id`（并剥离客户端自带的该 Header，防伪造）
+5. Java 服务只读内网 Header；`jwt.api_required: true`
 
-### 阶段 2（推荐）
-
-1. 登录成功后，由 **Gateway 或 auth 模块** 签发 JWT（payload 含 `uid`）
-2. 客户端：`Authorization: Bearer <token>`
-3. 网关验签，解析 `uid`，设置 `X-User-Id`
-4. Java 服务 **信任内网 Header**（不要再盲信客户端乱传的 userId——生产应只接受网关注入）
-
-你网关已有 JWT secret 配置（`gateway.yaml` 里 `jwt.secret`），业务 JWT 声明字段需与网关解析逻辑对齐（可能要小改网关；改之前先读 `docs/HTTP/02-jwt-auth.md`）。
+密钥两边对齐：`Gateway/.../gateway.yaml` 的 `jwt.secret` ↔ `user-service` 的 `firefly.jwt.secret`（至少 32 字节，供 HS256）。
 
 ---
 

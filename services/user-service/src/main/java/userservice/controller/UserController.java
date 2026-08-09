@@ -1,10 +1,12 @@
 package userservice.controller;
 
 import userservice.common.ApiResponse;
+import userservice.dto.AuthResponse;
 import userservice.dto.LoginRequest;
 import userservice.dto.RegisterRequest;
 import userservice.dto.UpdateProfileRequest;
 import userservice.entity.User;
+import userservice.service.JwtService;
 import userservice.service.UserService;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,29 +15,33 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final JwtService jwtService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, JwtService jwtService) {
         this.userService = userService;
+        this.jwtService = jwtService;
     }
 
     @PostMapping("/register")
-    public ApiResponse<User> register(@RequestBody RegisterRequest req) {
+    public ApiResponse<AuthResponse> register(@RequestBody RegisterRequest req) {
         try {
             User user = userService.register(
                     req.getUsername(), req.getPassword(), req.getNickname());
-            return ApiResponse.ok(user);
+            String token = jwtService.sign(user.getId());
+            return ApiResponse.ok(new AuthResponse(token, user));
         } catch (IllegalArgumentException e) {
             return ApiResponse.fail(40001, e.getMessage());
         }
     }
 
     @PostMapping("/login")
-    public ApiResponse<User> login(@RequestBody LoginRequest req) {
+    public ApiResponse<AuthResponse> login(@RequestBody LoginRequest req) {
         User user = userService.login(req.getUsername(), req.getPassword());
         if (user == null) {
             return ApiResponse.fail(40101, "用户名或密码错误");
         }
-        return ApiResponse.ok(user);
+        String token = jwtService.sign(user.getId());
+        return ApiResponse.ok(new AuthResponse(token, user));
     }
 
     @GetMapping("/me")

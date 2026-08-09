@@ -29,7 +29,7 @@ Vite 将 `/api`、`/files` 代理到 Gateway；Gateway 再按前缀转发：
 
 ## 建议自测路径
 
-1. 注册用户 A、B  
-2. A 发笔记 → B 点赞/评论  
+1. 注册/登录（返回 JWT，联调台自动保存）  
+2. A 发笔记 → B 登录后点赞/评论  
 3. A 在「通知」页刷新  
-4. 也可直接访问 `http://127.0.0.1:8080/api/user/me`（Header `X-User-Id`）
+4. 手动调用需：`Authorization: Bearer <token>`（不要再伪造 `X-User-Id`）

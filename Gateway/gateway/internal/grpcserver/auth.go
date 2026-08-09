@@ -51,11 +51,12 @@ func authenticate(ctx context.Context, secret []byte, required bool) (context.Co
 	if err != nil {
 		return ctx, status.Error(codes.Unauthenticated, "invalid token")
 	}
-	if !tenant.IsValid(claims.Tenant) {
+	t := claims.Tenant()
+	if !tenant.IsValid(t) {
 		return ctx, status.Error(codes.Unauthenticated, "unknown tenant")
 	}
-	ctx = context.WithValue(ctx, tenantKey, claims.Tenant)
-	ctx = metadata.AppendToOutgoingContext(ctx, "x-tenant", claims.Tenant)
+	ctx = context.WithValue(ctx, tenantKey, t)
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-tenant", t)
 	return ctx, nil
 }
 

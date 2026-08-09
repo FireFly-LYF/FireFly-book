@@ -12,10 +12,10 @@ tcp:
   listen: ""
 
 jwt:
-  secret: "phase3-dev-secret-change-me"
+  secret: "phase3-dev-secret-change-me-32bytes!"
   token_ttl: "24h"
-  # FireFly 联调阶段：业务 /api 不强制租户 JWT，客户端可继续带 X-User-Id
-  api_required: false
+  # 业务 /api 强制 JWT；仅 POST /api/user/register|login 白名单放行
+  api_required: true
 
 tenants:
   - tenant-a

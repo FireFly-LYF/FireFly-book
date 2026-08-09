@@ -153,7 +153,8 @@ func rewrite(pr *httputil.ProxyRequest, remote *url.URL, stripPrefix string) {
 		pr.Out.Header.Set("X-Tenant-Id", tenant)
 	}
 
-	// 网关解析出的 uid 优先；否则保留客户端已有的 X-User-Id（开发阶段）
+	// 防伪造：先清客户端 X-User-Id，再写入网关从 JWT 解析的 uid
+	pr.Out.Header.Del("X-User-Id")
 	if userID, ok := pr.In.Context().Value(ctxUserID).(string); ok && userID != "" {
 		pr.Out.Header.Set("X-User-Id", userID)
 	}

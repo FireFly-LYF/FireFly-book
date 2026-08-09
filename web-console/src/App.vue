@@ -1,10 +1,19 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { mediaApi, noteApi, notifyApi, socialApi, toLocalMediaUrl, userApi } from './api'
+import {
+  loadAuthSession,
+  mediaApi,
+  noteApi,
+  notifyApi,
+  saveAuthSession,
+  socialApi,
+  toLocalMediaUrl,
+  userApi,
+} from './api'
 
 const tab = ref('user')
 const log = ref([])
-const session = ref(loadSession())
+const session = ref(loadAuthSession())
 
 const reg = ref({ username: '', password: '123456', nickname: '' })
 const loginForm = ref({ username: '', password: '123456' })
@@ -31,7 +40,8 @@ const nicknames = ref({})
 
 const typeLabel = { LIKE: '点赞', COMMENT: '评论', FOLLOW: '关注' }
 
-const userId = computed(() => session.value?.id ?? null)
+const userId = computed(() => session.value?.user?.id ?? null)
+const displayUser = computed(() => session.value?.user ?? null)
 
 function displayName(uid) {
   if (uid == null) return ''
@@ -62,47 +72,87 @@ async function ensureNicknames(ids) {
   )
 }
 
-function loadSession() {
-  try {
-    return JSON.parse(localStorage.getItem('ff-session') || 'null')
-  } catch {
-    return null
+function saveSession(auth) {
+  // auth: { token, user }；兼容旧版仅 User（无 token 时需重新登录）
+  let next = null
+  if (auth?.token && auth?.user) {
+    next = { token: auth.token, user: auth.user }
+  } else if (auth?.id && !auth?.token) {
+    next = null
+  } else if (auth) {
+    next = auth
   }
+  session.value = next
+  saveAuthSession(next)
 }
 
-function saveSession(user) {
-  session.value = user
-  if (user) localStorage.setItem('ff-session', JSON.stringify(user))
-  else localStorage.removeItem('ff-session')
+/** 日志里截断 JWT，避免超长 token 撑破布局 */
+function formatLogPayload(payload) {
+  if (typeof payload === 'string') {
+    return payload.replace(
+      /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+      (t) => `${t.slice(0, 16)}…${t.slice(-8)}`,
+    )
+  }
+  try {
+    return JSON.stringify(
+      payload,
+      (key, value) => {
+        if (key === 'token' && typeof value === 'string' && value.length > 36) {
+          return `${value.slice(0, 16)}…${value.slice(-8)}`
+        }
+        return value
+      },
+      2,
+    )
+  } catch {
+    return String(payload)
+  }
 }
 
 function pushLog(title, payload) {
   log.value.unshift({
     time: new Date().toLocaleTimeString(),
     title,
-    payload: typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2),
+    payload: formatLogPayload(payload),
   })
   if (log.value.length > 30) log.value.pop()
 }
 
 async function doRegister() {
-  const res = await userApi().register(reg.value)
-  pushLog('注册', res.body)
-  if (res.body?.code === 0) {
+  try {
+    const res = await userApi().register(reg.value)
+    pushLog('注册', res.body)
+    if (res.body?.code !== 0) return
+    if (!res.body?.data?.token || !res.body?.data?.user) {
+      pushLog('注册', '未返回 JWT（data.token）。请重启已加载旧代码的 user-service')
+      return
+    }
     saveSession(res.body.data)
     loginForm.value.username = reg.value.username
+  } catch (e) {
+    pushLog('注册失败', String(e?.message || e))
   }
 }
 
 async function doLogin() {
-  const res = await userApi().login(loginForm.value)
-  pushLog('登录', res.body)
-  if (res.body?.code === 0) saveSession(res.body.data)
+  try {
+    const res = await userApi().login(loginForm.value)
+    pushLog('登录', res.body)
+    if (res.body?.code !== 0) return
+    if (!res.body?.data?.token || !res.body?.data?.user) {
+      pushLog('登录', '未返回 JWT（data.token）。请重启已加载旧代码的 user-service 后再登录')
+      return
+    }
+    saveSession(res.body.data)
+  } catch (e) {
+    pushLog('登录失败', String(e?.message || e))
+  }
 }
 
 async function doMe() {
   if (!userId.value) return pushLog('当前用户', '请先登录')
-  const res = await userApi().me(userId.value)
+  const res = await userApi().me()
   pushLog('GET /me', res.body)
 }
 
@@ -110,7 +160,7 @@ async function doFollow() {
   if (!userId.value) return pushLog('关注', '请先登录')
   const target = Number(followTargetId.value)
   if (!target) return pushLog('关注', '请填写对方用户 id')
-  const res = await userApi().follow(userId.value, target)
+  const res = await userApi().follow(target)
   pushLog(`关注 #${target}`, res.body)
   if (res.body?.code === 0) await loadFollowLists()
 }
@@ -119,7 +169,7 @@ async function doUnfollow() {
   if (!userId.value) return pushLog('取消关注', '请先登录')
   const target = Number(followTargetId.value)
   if (!target) return pushLog('取消关注', '请填写对方用户 id')
-  const res = await userApi().unfollow(userId.value, target)
+  const res = await userApi().unfollow(target)
   pushLog(`取消关注 #${target}`, res.body)
   if (res.body?.code === 0) await loadFollowLists()
 }
@@ -150,7 +200,7 @@ async function onPickFiles(e) {
   const files = [...(e.target.files || [])]
   e.target.value = ''
   for (const file of files) {
-    const res = await mediaApi().upload(userId.value, file)
+    const res = await mediaApi().upload(file)
     pushLog(`上传 ${file.name}`, res.body)
     if (res.body?.code === 0) {
       uploaded.value.unshift(res.body.data)
@@ -172,7 +222,7 @@ async function createNote() {
     coverUrl: noteForm.value.coverUrl || mediaUrls[0] || '',
     mediaUrls,
   }
-  const res = await noteApi().create(userId.value, payload)
+  const res = await noteApi().create(payload)
   pushLog('发笔记', res.body)
   if (res.body?.code === 0) {
     noteDetail.value = res.body.data
@@ -196,7 +246,7 @@ async function loadMyNotes() {
 
 async function deleteNote(id) {
   if (!userId.value) return
-  const res = await noteApi().remove(userId.value, id)
+  const res = await noteApi().remove(id)
   pushLog(`删除笔记 #${id}`, res.body)
   if (res.body?.code === 0) {
     await loadMyNotes()
@@ -212,7 +262,7 @@ async function refreshSocial() {
   if (countRes.body?.code === 0) likeCount.value = countRes.body.data?.count ?? 0
 
   if (userId.value) {
-    const meRes = await api.likedByMe(userId.value, noteId.value)
+    const meRes = await api.likedByMe(noteId.value)
     pushLog(`是否已赞 #${noteId.value}`, meRes.body)
     if (meRes.body?.code === 0) liked.value = !!meRes.body.data?.liked
   } else {
@@ -230,7 +280,7 @@ async function refreshSocial() {
 async function doLike() {
   if (!userId.value) return pushLog('点赞', '请先登录')
   if (!noteId.value) return pushLog('点赞', '请填写笔记 id')
-  const res = await socialApi().like(userId.value, noteId.value)
+  const res = await socialApi().like(noteId.value)
   pushLog(`点赞 #${noteId.value}`, res.body)
   if (res.body?.code === 0) {
     liked.value = true
@@ -241,7 +291,7 @@ async function doLike() {
 async function doUnlike() {
   if (!userId.value) return pushLog('取消赞', '请先登录')
   if (!noteId.value) return pushLog('取消赞', '请填写笔记 id')
-  const res = await socialApi().unlike(userId.value, noteId.value)
+  const res = await socialApi().unlike(noteId.value)
   pushLog(`取消赞 #${noteId.value}`, res.body)
   if (res.body?.code === 0) {
     liked.value = false
@@ -252,7 +302,7 @@ async function doUnlike() {
 async function doCollect() {
   if (!userId.value) return pushLog('收藏', '请先登录')
   if (!noteId.value) return pushLog('收藏', '请填写笔记 id')
-  const res = await socialApi().collect(userId.value, noteId.value)
+  const res = await socialApi().collect(noteId.value)
   pushLog(`收藏 #${noteId.value}`, res.body)
   if (res.body?.code === 0) collected.value = true
 }
@@ -260,7 +310,7 @@ async function doCollect() {
 async function doUncollect() {
   if (!userId.value) return pushLog('取消收藏', '请先登录')
   if (!noteId.value) return pushLog('取消收藏', '请填写笔记 id')
-  const res = await socialApi().uncollect(userId.value, noteId.value)
+  const res = await socialApi().uncollect(noteId.value)
   pushLog(`取消收藏 #${noteId.value}`, res.body)
   if (res.body?.code === 0) collected.value = false
 }
@@ -274,7 +324,7 @@ async function doComment() {
     content: commentText.value,
     parentId: parentRaw === '' ? null : Number(parentRaw),
   }
-  const res = await socialApi().comment(userId.value, payload)
+  const res = await socialApi().comment(payload)
   pushLog(`发评论 #${noteId.value}`, res.body)
   if (res.body?.code === 0) {
     commentText.value = ''
@@ -285,7 +335,7 @@ async function doComment() {
 
 async function loadNotifications() {
   if (!userId.value) return pushLog('通知', '请先登录')
-  const res = await notifyApi().list(userId.value, 1, 50)
+  const res = await notifyApi().list(1, 50)
   pushLog('通知列表', res.body)
   if (res.body?.code === 0) {
     notifications.value = res.body.data || []
@@ -295,14 +345,14 @@ async function loadNotifications() {
 
 async function markNotifyRead(ids) {
   if (!userId.value) return pushLog('已读', '请先登录')
-  const res = await notifyApi().read(userId.value, { ids })
+  const res = await notifyApi().read({ ids })
   pushLog('标已读', res.body)
   if (res.body?.code === 0) await loadNotifications()
 }
 
 async function markAllNotifyRead() {
   if (!userId.value) return pushLog('全部已读', '请先登录')
-  const res = await notifyApi().read(userId.value, { all: true })
+  const res = await notifyApi().read({ all: true })
   pushLog('全部已读', res.body)
   if (res.body?.code === 0) await loadNotifications()
 }
@@ -320,13 +370,13 @@ watch(tab, (t) => {
       <div>
         <p class="eyebrow">FireFly · Dev Console</p>
         <h1>联调台</h1>
-        <p class="sub">注册登录 → 上传/发笔记 → 赞藏评/关注 → 通知，可视化走通主链路</p>
+        <p class="sub">注册/登录拿 JWT → 经 Gateway 带 Bearer → 上传/笔记/互动/通知</p>
       </div>
-      <div class="session" v-if="session">
-        <div class="avatar">{{ session.nickname?.[0] || 'U' }}</div>
+      <div class="session" v-if="displayUser">
+        <div class="avatar">{{ displayUser.nickname?.[0] || 'U' }}</div>
         <div>
-          <strong>{{ session.nickname || session.username }}</strong>
-          <div class="muted">id={{ session.id }} · {{ session.username }}</div>
+          <strong>{{ displayUser.nickname || displayUser.username }}</strong>
+          <div class="muted">id={{ displayUser.id }} · JWT 已保存</div>
         </div>
         <button class="ghost" type="button" @click="logout">退出</button>
       </div>
@@ -404,7 +454,7 @@ watch(tab, (t) => {
 
       <section class="panel" v-show="tab === 'media'">
         <h2>上传图片</h2>
-        <p class="hint">走 media-service `:9003`，字段名 <code>file</code>，Header <code>X-User-Id</code></p>
+        <p class="hint">经 Gateway；自动带 <code>Authorization: Bearer</code>（登录后签发的 JWT）</p>
         <label class="upload">
           <input type="file" accept="image/*" multiple hidden @change="onPickFiles" />
           <span>选择图片上传</span>
@@ -473,7 +523,7 @@ watch(tab, (t) => {
 
       <section class="panel" v-show="tab === 'social'">
         <h2>赞 / 藏 / 评</h2>
-        <p class="hint">走 social-service `:9004`；写接口需要 Header <code>X-User-Id</code></p>
+        <p class="hint">经 Gateway；JWT 验签后由网关注入 <code>X-User-Id</code></p>
         <div class="row">
           <input v-model="noteId" placeholder="笔记 id" style="max-width: 140px" />
           <button type="button" class="ghost" @click="refreshSocial">刷新状态</button>
@@ -520,7 +570,7 @@ watch(tab, (t) => {
 
       <section class="panel" v-show="tab === 'notify'">
         <h2>我的通知</h2>
-        <p class="hint">走 notify-service `:9005`；列表按时间倒序。异步写入，点赞后可稍等再刷新</p>
+        <p class="hint">经 Gateway；需已登录 JWT。列表按时间倒序，点赞后可稍等再刷新</p>
         <div class="row wrap">
           <button type="button" @click="loadNotifications">刷新列表</button>
           <button type="button" class="ghost" @click="markAllNotifyRead" :disabled="!notifications.length">
@@ -662,12 +712,13 @@ h1 {
 
 .grid {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: 1rem;
   align-items: start;
 }
 
 .panel {
+  min-width: 0;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -893,6 +944,10 @@ button.tiny {
   overflow: auto;
   font-size: 0.78rem;
   max-height: 220px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 
 @keyframes rise {

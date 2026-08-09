@@ -9,7 +9,7 @@ tcp:
   listen: ":8081"
 
 jwt:
-  secret: "phase3-dev-secret-change-me"
+  secret: "phase3-dev-secret-change-me-32bytes!"
   token_ttl: "24h"
 
 tenants:
