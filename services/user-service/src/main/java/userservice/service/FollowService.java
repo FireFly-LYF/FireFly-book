@@ -3,6 +3,9 @@ package userservice.service;
 import userservice.entity.User;
 import userservice.mapper.FollowMapper;
 import userservice.mapper.UserMapper;
+import userservice.mq.MqConstants;
+import userservice.mq.NotifyEvent;
+import userservice.mq.NotifyEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,10 +15,15 @@ public class FollowService {
 
     private final FollowMapper followMapper;
     private final UserMapper userMapper;
+    private final NotifyEventPublisher notifyEventPublisher;
 
-    public FollowService(FollowMapper followMapper, UserMapper userMapper) {
+    public FollowService(
+            FollowMapper followMapper,
+            UserMapper userMapper,
+            NotifyEventPublisher notifyEventPublisher) {
         this.followMapper = followMapper;
         this.userMapper = userMapper;
+        this.notifyEventPublisher = notifyEventPublisher;
     }
 
     public void follow(Long followerId, Long followeeId) {
@@ -29,6 +37,9 @@ public class FollowService {
             throw new IllegalArgumentException("已关注该用户");
         }
         followMapper.insert(followerId, followeeId);
+        NotifyEvent event = new NotifyEvent(
+                followeeId, followerId, "FOLLOW", null, "关注了你");
+        notifyEventPublisher.publish(MqConstants.RK_FOLLOW_CREATED, event);
     }
 
     public void unfollow(Long followerId, Long followeeId) {

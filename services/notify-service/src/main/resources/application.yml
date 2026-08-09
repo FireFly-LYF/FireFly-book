@@ -1,11 +1,11 @@
 server:
-  port: 9004
+  port: 9005
 
 spring:
   application:
-    name: social-service
+    name: notify-service
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/social?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://127.0.0.1:3306/notify?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -15,11 +15,7 @@ spring:
     username: guest
     password: guest
 
-firefly:
-  content:
-    base-url: http://127.0.0.1:9002
-
 mybatis:
   configuration:
     map-underscore-to-camel-case: true
-  type-aliases-package: socialservice.entity
+  type-aliases-package: notifyservice.entity
