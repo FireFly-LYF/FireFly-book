@@ -6,10 +6,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api/user': { target: 'http://127.0.0.1:9001', changeOrigin: true },
-      '/api/note': { target: 'http://127.0.0.1:9002', changeOrigin: true },
-      '/api/media': { target: 'http://127.0.0.1:9003', changeOrigin: true },
-      '/files': { target: 'http://127.0.0.1:9003', changeOrigin: true },
+      // 统一经 Gateway :8080 按路径转发到各 Java 服务
+      '/api': { target: 'http://127.0.0.1:8080', changeOrigin: true },
+      '/files': { target: 'http://127.0.0.1:8080', changeOrigin: true },
     },
   },
 })

@@ -8,6 +8,7 @@ import (
 
 type Claims struct {
 	Tenant string `json:"iss"`
+	UserID string `json:"uid,omitempty"` // 业务用户 id；有则网关注入 X-User-Id
 	jwt.RegisteredClaims
 	//嵌入后，Claims 自动拥有 JWT 标准字段
 }

@@ -13,8 +13,8 @@ import (
 
 	"gateway/internal/config"
 	"gateway/internal/handler"
-	"gateway/internal/proxy"
 	"gateway/internal/middleware"
+	"gateway/internal/proxy"
 	"gateway/internal/ratelimit"
 	redisx "gateway/internal/redis"
 	"gateway/internal/registry"
@@ -29,13 +29,11 @@ var configPath = flag.String("config", "internal/config/gateway.yaml", "path to 
 func main() {
 	flag.Parse()
 
-	// ① 加载 yaml：租户白名单、JWT、LB 策略、HTTP/gRPC 下游等
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// ② 连接 Redis；连不上则 client=nil，限流降级为本地滑动窗口，统计跳过
 	redisAddr := cfg.RedisAddr()
 	candidate := redisx.New(redisAddr)
 	var client *redis.Client
@@ -45,7 +43,6 @@ func main() {
 		client = candidate
 	}
 
-	// ③ 网关治理组件（HTTP / gRPC 共用同一实例，配额与熔断不区分协议）
 	limiter := ratelimit.NewLimiter(client, cfg.RateLimitRate(), cfg.RateLimitCapacity(), cfg.RateLimitDailyLimit())
 	var breaker *registry.CircuitBreaker
 	if cfg.CircuitBreakerEnabled() {
@@ -53,7 +50,6 @@ func main() {
 	}
 	recorder := redisx.NewStatsRecorder(client)
 
-	// ④ 统一下游注册表 + 三个 balancer 视图（策略相同，节点按 HTTP/gRPC/TCP 过滤）
 	lbCfg := cfg.LBConfig()
 	var reg registry.Registry
 	switch cfg.RegistryType() {
@@ -71,10 +67,33 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	registry.Sync(reg, bs)                                     // 健康节点 → SetNodes
-	registry.StartHealthCheck(reg, bs, 10*time.Second)         // 后台每 10s 探测并刷新
+	registry.Sync(reg, bs)
+	registry.StartHealthCheck(reg, bs, 10*time.Second)
 
-	// ⑤ gRPC 透明代理（goroutine 并行监听 grpc.listen，与 HTTP 共用 limiter/breaker/recorder）
+	var httpRouter *registry.HTTPRouter
+	if cfg.HasHTTPRoutes() {
+		httpRouter = registry.NewHTTPRouter()
+		for _, rc := range cfg.Routes {
+			routeReg := registry.NewMemory(cfg.RouteUpstreams(rc))
+			routeBS, err := registry.NewBalancers(lbCfg)
+			if err != nil {
+				log.Fatalf("route %s balancer: %v", rc.ID, err)
+			}
+			registry.Sync(routeReg, routeBS)
+			registry.StartHealthCheck(routeReg, routeBS, 10*time.Second)
+			if err := httpRouter.Add(&registry.HTTPRoute{
+				ID:           rc.ID,
+				Prefix:       rc.Prefix,
+				AuthRequired: cfg.RouteAuthRequired(rc),
+				Reg:          routeReg,
+				Balancers:    routeBS,
+			}); err != nil {
+				log.Fatalf("route %s: %v", rc.ID, err)
+			}
+			log.Printf("http route id=%s prefix=%s upstreams=%v", rc.ID, rc.Prefix, routeReg.ListHealthyHTTPURLs())
+		}
+	}
+
 	if cfg.GRPCEnabled() {
 		grpcListen := cfg.GRPCListen()
 		grpcUpstreams := strings.Join(reg.ListHealthyGRPCAddrs(), ", ")
@@ -87,7 +106,6 @@ func main() {
 		}()
 	}
 
-	// ⑤b TCP 透明代理（连接级转发，复用 LB / 熔断 / IP 黑名单）
 	ipBlockSet := middleware.IPsToSet(cfg.Security.IPBlocklist)
 	if cfg.TCPEnabled() {
 		tcpListen := cfg.TCPListen()
@@ -101,21 +119,20 @@ func main() {
 		}()
 	}
 
-	// ⑥ 注册 HTTP 路由：/gateway/* 管理面，/api/* 业务链（JWT → 限流 → 统计 → 代理）
 	r := gin.New()
-	handler.New(cfg, client, limiter, breaker, recorder, reg, bs).Register(r)
+	handler.New(cfg, client, limiter, breaker, recorder, reg, bs, httpRouter).Register(r)
 
 	ratelimitMode := "redis token-bucket"
 	if client == nil {
 		ratelimitMode = "local sliding window (redis down)"
 	}
-	httpUpstreams := strings.Join(reg.ListHealthyHTTPURLs(), ", ")
-	grpcUpstreams := strings.Join(reg.ListHealthyGRPCAddrs(), ", ")
-	tcpUpstreams := strings.Join(reg.ListHealthyTCPAddrs(), ", ")
-	log.Printf("http gateway listening on %s, redis=%s, ratelimit=%s qps=%d/%d qpd=%d, lb=%s, http_upstreams=[%s], grpc_upstreams=[%s], tcp_upstreams=[%s]",
-		cfg.Server.Addr, redisAddr, ratelimitMode, cfg.RateLimitRate(), cfg.RateLimitCapacity(), cfg.RateLimitDailyLimit(), lbCfg.Strategy, httpUpstreams, grpcUpstreams, tcpUpstreams)
+	mode := "single-pool"
+	if httpRouter != nil {
+		mode = "path-routes"
+	}
+	log.Printf("http gateway listening on %s, mode=%s, strip_prefix=%q, api_auth=%v, redis=%s, ratelimit=%s",
+		cfg.Server.Addr, mode, cfg.StripPrefix(), cfg.APIAuthRequired(), redisAddr, ratelimitMode)
 
-	// ⑦ 阻塞监听 server.addr（主 goroutine；gRPC 已在 ⑤ 中启动）
 	if err := r.Run(cfg.Server.Addr); err != nil {
 		log.Fatal(err)
 	}

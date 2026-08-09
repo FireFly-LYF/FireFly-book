@@ -36,10 +36,11 @@
 
 你需要确认/扩展的两点（开发时注意）：
 
-1. **按路径转发到不同服务**  
-   若当前配置是「所有 HTTP 进同一组 upstream」，需要按产品演进为：  
-   `/api/user` → user 组，`/api/note` → content 组……  
-   若一时改不了网关路由表，**过渡方案**：本机用多个网关实例或先直连 Java 端口开发，联调时再改网关。
+1. **按路径转发到不同服务**（已实现）  
+   在 `Gateway/gateway/internal/config/gateway.yaml` 的 `routes` 中配置：  
+   `/api/user` → :9001，`/api/note` → :9002，`/api/media`+/`files` → :9003，  
+   `/api/social` → :9004，`/api/notify` → :9005（feed/search 预留 9006/9007）。  
+   `proxy.strip_prefix: ""` 表示**保留完整路径**，与 Java `@RequestMapping("/api/...")` 对齐。
 
 2. **把登录用户传给 Java**  
    网关验完 JWT 后，应把 `userId` 写入 Header，例如 `X-User-Id`，Java 只读 Header。  

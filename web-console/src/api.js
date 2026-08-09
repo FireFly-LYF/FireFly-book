@@ -28,6 +28,19 @@ export function userApi() {
       request('/api/user/me', {
         headers: { 'X-User-Id': String(userId) },
       }),
+    getById: (id) => request(`/api/user/${id}`),
+    follow: (userId, followeeId) =>
+      request(`/api/user/follow/${followeeId}`, {
+        method: 'POST',
+        headers: { 'X-User-Id': String(userId) },
+      }),
+    unfollow: (userId, followeeId) =>
+      request(`/api/user/follow/${followeeId}`, {
+        method: 'DELETE',
+        headers: { 'X-User-Id': String(userId) },
+      }),
+    followers: (id) => request(`/api/user/${id}/followers`),
+    following: (id) => request(`/api/user/${id}/following`),
   }
 }
 
@@ -64,6 +77,66 @@ export function noteApi() {
       request(`/api/note/${id}`, {
         method: 'DELETE',
         headers: { 'X-User-Id': String(userId) },
+      }),
+  }
+}
+
+export function socialApi() {
+  const headers = (userId) => ({
+    'Content-Type': 'application/json',
+    ...(userId != null ? { 'X-User-Id': String(userId) } : {}),
+  })
+  return {
+    like: (userId, noteId) =>
+      request(`/api/social/like/${noteId}`, {
+        method: 'POST',
+        headers: headers(userId),
+      }),
+    unlike: (userId, noteId) =>
+      request(`/api/social/like/${noteId}`, {
+        method: 'DELETE',
+        headers: headers(userId),
+      }),
+    likeCount: (noteId) => request(`/api/social/like/${noteId}/count`),
+    likedByMe: (userId, noteId) =>
+      request(`/api/social/like/${noteId}/me`, {
+        headers: headers(userId),
+      }),
+    collect: (userId, noteId) =>
+      request(`/api/social/collect/${noteId}`, {
+        method: 'POST',
+        headers: headers(userId),
+      }),
+    uncollect: (userId, noteId) =>
+      request(`/api/social/collect/${noteId}`, {
+        method: 'DELETE',
+        headers: headers(userId),
+      }),
+    comment: (userId, data) =>
+      request('/api/social/comment', {
+        method: 'POST',
+        headers: headers(userId),
+        body: JSON.stringify(data),
+      }),
+    comments: (noteId) => request(`/api/social/comment/${noteId}`),
+  }
+}
+
+export function notifyApi() {
+  const headers = (userId) => ({
+    'Content-Type': 'application/json',
+    ...(userId != null ? { 'X-User-Id': String(userId) } : {}),
+  })
+  return {
+    list: (userId, page = 1, size = 20) =>
+      request(`/api/notify/list?page=${page}&size=${size}`, {
+        headers: headers(userId),
+      }),
+    read: (userId, data) =>
+      request('/api/notify/read', {
+        method: 'POST',
+        headers: headers(userId),
+        body: JSON.stringify(data),
       }),
   }
 }

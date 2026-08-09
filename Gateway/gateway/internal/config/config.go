@@ -27,12 +27,28 @@ type Config struct {
 	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
 	Registry       RegistryConfig       `yaml:"registry"`
 	LoadBalancer   LBConfig             `yaml:"loadbalancer"`
+	Proxy          ProxyConfig          `yaml:"proxy"`
+	Routes         []RouteConfig        `yaml:"routes"`
 
 	jwtSecret    []byte        // JWT.Secret 的字节形式，供签发/验签使用
 	tokenTTL     time.Duration // JWT.TokenTTL 解析后的时长，如 "24h"
 	lbCfg        lb.Config     // HTTP 整理后的 LB 配置（节点 URL + 权重）
 	balancer     lb.Balancer   // HTTP 负载均衡器，proxy 直接调用
 	grpcBalancer lb.Balancer   // gRPC 负载均衡器，grpc director 调用
+}
+
+// ProxyConfig 控制反向代理路径改写。
+// StripPrefix 非空时剥离此前缀（旧演示：/api）；空则保留完整路径（FireFly Java：/api/user/...）。
+type ProxyConfig struct {
+	StripPrefix string `yaml:"strip_prefix"`
+}
+
+// RouteConfig 按路径前缀转发到独立 upstream 组。
+type RouteConfig struct {
+	ID        string           `yaml:"id"`
+	Prefix    string           `yaml:"prefix"`
+	Auth      *bool            `yaml:"auth"` // nil 表示跟随 jwt.api_required
+	Upstreams []UpstreamConfig `yaml:"upstreams"`
 }
 
 type RedisConfig struct {
@@ -50,8 +66,9 @@ type ServerConfig struct {
 }
 
 type JWTConfig struct {
-	Secret   string `yaml:"secret"`    // HS256 签名密钥
-	TokenTTL string `yaml:"token_ttl"` // Token 有效期，Go duration 格式，如 24h、30m
+	Secret      string `yaml:"secret"`       // HS256 签名密钥
+	TokenTTL    string `yaml:"token_ttl"`    // Token 有效期，Go duration 格式，如 24h、30m
+	APIRequired *bool  `yaml:"api_required"` // /api 是否强制 JWT；nil/true=强制，false=开发联调可跳过
 }
 
 type LBConfig struct {
@@ -206,12 +223,38 @@ func (c *Config) validate() error {
 	if len(c.Tenants) == 0 {
 		return fmt.Errorf("tenants must not be empty")
 	}
-	if len(c.LoadBalancer.Upstreams) == 0 {
-		return fmt.Errorf("loadbalancer.upstreams must not be empty")
+	if len(c.Routes) == 0 && len(c.LoadBalancer.Upstreams) == 0 {
+		return fmt.Errorf("routes or loadbalancer.upstreams must not be empty")
 	}
 	for i, u := range c.LoadBalancer.Upstreams {
 		if u.HTTP == "" && u.GRPC == "" && u.TCP == "" && u.Addr == "" {
 			return fmt.Errorf("loadbalancer.upstreams[%d] requires http, grpc, tcp, or addr", i)
+		}
+	}
+	seenID := map[string]struct{}{}
+	seenPrefix := map[string]struct{}{}
+	for i, route := range c.Routes {
+		if route.ID == "" {
+			return fmt.Errorf("routes[%d].id must not be empty", i)
+		}
+		if route.Prefix == "" {
+			return fmt.Errorf("routes[%d].prefix must not be empty", i)
+		}
+		if len(route.Upstreams) == 0 {
+			return fmt.Errorf("routes[%d].upstreams must not be empty", i)
+		}
+		if _, ok := seenID[route.ID]; ok {
+			return fmt.Errorf("duplicate routes id %q", route.ID)
+		}
+		if _, ok := seenPrefix[route.Prefix]; ok {
+			return fmt.Errorf("duplicate routes prefix %q", route.Prefix)
+		}
+		seenID[route.ID] = struct{}{}
+		seenPrefix[route.Prefix] = struct{}{}
+		for j, u := range route.Upstreams {
+			if u.HTTP == "" && u.Addr == "" {
+				return fmt.Errorf("routes[%d].upstreams[%d] requires http or addr", i, j)
+			}
 		}
 	}
 	if c.GRPCEnabled() {
@@ -249,6 +292,45 @@ func (c *Config) validate() error {
 
 func (c *Config) JWTSecret() []byte {
 	return c.jwtSecret
+}
+
+// APIAuthRequired /api 业务链是否强制 JWT；未配置时默认 true（兼容旧行为）。
+func (c *Config) APIAuthRequired() bool {
+	if c.JWT.APIRequired == nil {
+		return true
+	}
+	return *c.JWT.APIRequired
+}
+
+// StripPrefix 代理路径剥离前缀；空表示保留完整路径。
+func (c *Config) StripPrefix() string {
+	return c.Proxy.StripPrefix
+}
+
+// HasHTTPRoutes 是否启用按路径路由表。
+func (c *Config) HasHTTPRoutes() bool {
+	return len(c.Routes) > 0
+}
+
+// RouteAuthRequired 单条路由是否鉴权；未设置时跟随全局 api_required。
+func (c *Config) RouteAuthRequired(route RouteConfig) bool {
+	if route.Auth != nil {
+		return *route.Auth
+	}
+	return c.APIAuthRequired()
+}
+
+// RouteUpstreams 把某条 route 的 upstreams 规范为 Endpoint。
+func (c *Config) RouteUpstreams(route RouteConfig) []upstream.Endpoint {
+	eps := make([]upstream.Endpoint, 0, len(route.Upstreams))
+	for _, u := range route.Upstreams {
+		ep, err := upstream.Normalize(u.HTTP, u.GRPC, u.TCP, u.Addr, u.Weight)
+		if err != nil {
+			continue
+		}
+		eps = append(eps, ep)
+	}
+	return eps
 }
 
 // RedisAddr 返回 Redis 地址；yaml 未配置时默认 localhost:6379。
