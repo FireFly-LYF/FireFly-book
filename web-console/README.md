@@ -1,13 +1,13 @@
-# FireFly 联调台（Vue）
+# FireFly 联调前端（小红书风）
 
-本地可视化测试：浏览器 → Vite → **Gateway :8080** → 各 Java 服务。
+响应式网页 UI：桌面顶栏 + 多列瀑布流；窄屏仍用底栏。已有后端能力直接接入；未实现能力标注「待实现」。
 
 ## 启动
 
 1. MySQL / Redis / RabbitMQ  
-2. Java 服务（9001–9005；feed/search 未实现时可忽略）  
+2. Java 服务（9001–9005）  
 3. Gateway：`cd Gateway/gateway && go run ./cmd/gateway`  
-4. 联调台：
+4. 前端：
 
 ```powershell
 cd d:\A_Software\Java\SAVE\FireFly-book\web-console
@@ -15,21 +15,28 @@ npm install
 npm run dev
 ```
 
-浏览器打开 http://localhost:5173
+浏览器打开 http://localhost:5173  
 
-Vite 将 `/api`、`/files` 代理到 Gateway；Gateway 再按前缀转发：
+Vite 将 `/api`、`/files` 代理到 Gateway `:8080`。
 
-| 前缀 | 后端 |
+## 已接入
+
+| 模块 | 能力 |
 |------|------|
-| `/api/user` | :9001 |
-| `/api/note` | :9002 |
-| `/api/media`、`/files` | :9003 |
-| `/api/social` | :9004 |
-| `/api/notify` | :9005 |
+| 用户 | 注册/登录 JWT、关注/取关、粉丝与关注列表、个人主页笔记 |
+| 媒体 | 发布页上传封面 |
+| 笔记 | 创建、详情、按用户列表 |
+| 互动 | 点赞/取消、收藏/取消、评论列表与发表 |
+| 通知 | 通知列表、已读 |
 
-## 建议自测路径
+发现/关注流目前用「我的笔记 + 关注用户笔记」聚合，**不是**独立 `feed-service`。
 
-1. 注册/登录（返回 JWT，联调台自动保存）  
-2. A 发笔记 → B 登录后点赞/评论  
-3. A 在「通知」页刷新  
-4. 手动调用需：`Authorization: Bearer <token>`（不要再伪造 `X-User-Id`）
+## 待实现（仅前端占位）
+
+- 附近（LBS）
+- 搜索 / 热榜（`search-service`）
+- 全局推荐发现流（`feed-service`）
+- 市集 / 电商
+- 私信 IM
+- 个人页：编辑资料、收藏夹、赞过列表、获赞总数
+- 发布页：话题 / 地点 / @用户
