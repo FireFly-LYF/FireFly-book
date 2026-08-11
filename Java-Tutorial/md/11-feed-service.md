@@ -150,8 +150,10 @@ public class HttpConfig {
 
 ## 本章验收
 
-- [ ] 关注流只含关注作者的笔记
-- [ ] 按时间大致倒序
-- [ ] 无关注时返回空数组而不是报错
+- [x] 关注流只含关注作者的笔记（`feed-service` 读扩散 + `GET /api/user/me/following-ids`）
+- [x] 按时间大致倒序
+- [x] 无关注时返回空数组而不是报错
+
+启动：`cd services/feed-service && ./mvnw spring-boot:run`（依赖 user:9001、content:9002；经 Gateway 则 `:8080/api/feed/**`）。
 
 下一章：搜索（可后做）→ [12-search-service.md](./12-search-service.md)

@@ -58,6 +58,12 @@ public class FollowService {
         return followMapper.findFollowing(userId);
     }
 
+    public List<Long> listFollowingIds(Long userId) {
+        requireUser(userId);
+        List<Long> ids = followMapper.findFollowingIds(userId);
+        return ids != null ? ids : List.of();
+    }
+
     private void requireUser(Long userId) {
         if (userMapper.findById(userId) == null) {
             throw new IllegalArgumentException("用户不存在");

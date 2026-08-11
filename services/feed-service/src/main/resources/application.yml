@@ -1,0 +1,10 @@
+server:
+  port: 9006
+
+spring:
+  application:
+    name: feed-service
+
+firefly:
+  user-base-url: http://127.0.0.1:9001
+  content-base-url: http://127.0.0.1:9002

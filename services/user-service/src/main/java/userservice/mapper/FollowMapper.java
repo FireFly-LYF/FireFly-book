@@ -28,4 +28,8 @@ public interface FollowMapper {
             "FROM user u INNER JOIN follow f ON u.id = f.followee_id " +
             "WHERE f.follower_id = #{userId} ORDER BY f.created_at DESC")
     List<User> findFollowing(@Param("userId") Long userId);
+
+    /** 关注的人 id 列表（Feed 读扩散用） */
+    @Select("SELECT followee_id FROM follow WHERE follower_id = #{followerId} ORDER BY created_at DESC")
+    List<Long> findFollowingIds(@Param("followerId") Long followerId);
 }

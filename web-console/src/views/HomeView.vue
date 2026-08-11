@@ -2,7 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import NoteCard from '../components/NoteCard.vue'
 import TodoBadge from '../components/TodoBadge.vue'
-import { noteApi, socialApi, userApi } from '../api'
+import { feedApi, noteApi, socialApi, userApi } from '../api'
 
 const props = defineProps({
   userId: { type: Number, default: null },
@@ -68,16 +68,26 @@ async function loadFeed() {
     }
 
     if (channel.value === 'follow') {
-      const fg = await userApi().following(props.userId)
-      const users = fg.body?.code === 0 ? fg.body.data || [] : []
-      const ids = users.map((u) => u.id).filter(Boolean)
-      if (!ids.length) {
+      // 读扩散：经 Gateway → feed-service → user following-ids + content 笔记
+      const res = await feedApi().following(40)
+      if (res.body?.code !== 0) {
         notes.value = []
-        tip.value = '还没有关注的人，去个人页关注后这里会显示其笔记'
+        tip.value = res.body?.message || '关注流加载失败（请确认 feed-service :9006 已启动）'
         return
       }
-      await collectNotes(ids)
-      tip.value = '关注流：聚合关注用户的笔记（非独立 feed 接口）'
+      const items = res.body.data || []
+      notes.value = items.map((it) => ({
+        id: it.noteId,
+        userId: it.userId,
+        title: it.title,
+        coverUrl: it.coverUrl,
+        createdAt: it.createdAt,
+      }))
+      await ensureNames(notes.value.map((n) => n.userId))
+      await loadLikes(notes.value)
+      tip.value = items.length
+        ? '关注流：feed-service 读扩散（关注作者笔记，按时间倒序）'
+        : '还没有关注的人或对方暂无笔记，去个人页关注后再刷新'
       return
     }
 
@@ -90,7 +100,7 @@ async function loadFeed() {
       notes.value = DEMO_NOTES
       tip.value = '暂无真实笔记，展示示例卡。发布笔记后会出现在这里'
     } else {
-      tip.value = '发现页暂用「我的+关注」聚合，完整推荐流待 feed-service'
+      tip.value = '发现页暂用「我的+关注」聚合；关注频道已接 feed-service 读扩散'
     }
   } finally {
     loading.value = false
@@ -103,7 +113,19 @@ async function collectNotes(userIds) {
     unique.map(async (uid) => {
       const res = await noteApi().listByUser(uid, 1, 20)
       if (res.body?.code !== 0) return []
-      const list = res.body.data || []
+      return res.body.data || []
+    }),
+  )
+  const merged = chunks.flat().sort((a, b) => (b.id || 0) - (a.id || 0))
+  notes.value = merged
+  await ensureNames(unique)
+  await loadLikes(merged)
+}
+
+async function ensureNames(userIds) {
+  const missing = [...new Set(userIds.filter(Boolean))].filter((id) => !names.value[id])
+  await Promise.all(
+    missing.map(async (uid) => {
       const u = await userApi().getById(uid)
       if (u.body?.code === 0) {
         const user = u.body.data
@@ -112,16 +134,22 @@ async function collectNotes(userIds) {
           [uid]: user.nickname || user.username || `用户${uid}`,
         }
       }
-      return list
     }),
   )
-  const merged = chunks.flat().sort((a, b) => (b.id || 0) - (a.id || 0))
-  notes.value = merged
+}
+
+async function loadLikes(list) {
+  const countOf = (body) => {
+    const d = body?.data
+    if (typeof d === 'number') return d
+    if (d && typeof d.count === 'number') return d.count
+    return 0
+  }
   await Promise.all(
-    merged.slice(0, 24).map(async (n) => {
+    list.slice(0, 24).map(async (n) => {
       const c = await socialApi().likeCount(n.id)
       if (c.body?.code === 0) {
-        likes.value = { ...likes.value, [n.id]: c.body.data ?? 0 }
+        likes.value = { ...likes.value, [n.id]: countOf(c.body) }
       }
     }),
   )

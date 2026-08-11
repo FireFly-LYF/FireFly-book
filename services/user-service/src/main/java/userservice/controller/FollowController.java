@@ -47,6 +47,20 @@ public class FollowController {
         }
     }
 
+    /** Feed 读扩散：当前登录用户关注的人 id 列表 */
+    @GetMapping("/me/following-ids")
+    public ApiResponse<List<Long>> myFollowingIds(
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        if (userId == null) {
+            return ApiResponse.fail(40100, "未登录");
+        }
+        try {
+            return ApiResponse.ok(followService.listFollowingIds(userId));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.fail(40401, e.getMessage());
+        }
+    }
+
     @GetMapping("/{id}/followers")
     public ApiResponse<List<User>> followers(@PathVariable Long id) {
         try {

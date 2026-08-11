@@ -180,6 +180,16 @@ export function notifyApi() {
   }
 }
 
+/** 关注流：feed-service 读扩散 */
+export function feedApi() {
+  return {
+    following: (size = 20) =>
+      request(`/api/feed/following?size=${size}`, {
+        headers: authHeaders(),
+      }),
+  }
+}
+
 /** 把后端绝对地址改成走 Vite 代理，便于页面预览 */
 export function toLocalMediaUrl(url) {
   if (!url) return ''
