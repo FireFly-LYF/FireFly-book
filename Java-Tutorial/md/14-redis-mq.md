@@ -59,9 +59,11 @@ Key: note:liked:{noteId}:{userId}
 SET NX + TTL 或直接用 Set：note:liked:users:{noteId}
 ```
 
-### 3. 新手练习
+### 3. 新手练习（已在 social-service 落地）
 
-在 social-service：点赞时 `INCR`，取消 `DECR`，count 接口优先读 Redis。
+点赞：`INSERT note_like` 成功后 `INCR note:like:count:{noteId}`（无 key 则按 DB `COUNT` 回填）。  
+取消：`DELETE` 成功后 `DECR`。  
+`GET /api/social/like/{noteId}/count` 优先读 Redis，未命中再查库并回写（TTL 24h）。
 
 ---
 
@@ -120,7 +122,7 @@ Spring 可用 `spring-boot-starter-amqp`（RabbitMQ）。
 
 ## 本章验收
 
-- [ ] 能用代码向 Redis set/get
+- [x] 能用代码向 Redis set/get（social-service 点赞计数）
 - [ ] 能说清「缓存与数据库谁为准」（DB 为准）
 - [ ] 能说清 MQ 解决什么问题（解耦、异步、削峰）
 
