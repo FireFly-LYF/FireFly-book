@@ -32,11 +32,12 @@ func New(cfg *config.Config, rdb *redis.Client, limiter *ratelimit.Limiter, cb *
 
 func (g *Gateway) Register(r *gin.Engine) {
 	r.Use(gin.Recovery())
-	r.Use(middleware.CORS())
+	r.Use(middleware.CORS(g.cfg.CORS.AllowedOrigins, g.cfg.CORS.AllowCredentials))
 	r.Use(middleware.RequestLogger())
 	r.Use(middleware.IPBlockList(middleware.IPsToSet(g.cfg.Security.IPBlocklist)))
 
-	r.POST("/gateway/login", g.Login)
+	// /gateway/login 已禁用：无真实凭证签发与业务同 secret 的 JWT，生产不可用。
+	// 业务鉴权走 /api/user/login；运维请用独立通道，勿复用业务 Token。
 	r.GET("/gateway/health", g.Health)
 
 	admin := r.Group("/gateway")
@@ -70,7 +71,12 @@ func (g *Gateway) Register(r *gin.Engine) {
 
 	api := r.Group("/api")
 	api.Use(apiAuth)
-	api.Use(middleware.BlockList([]string{"/api/internal"}))
+	// 显式前缀 + 通配 /api/<svc>/inner/**（见 middleware.BlockList）
+	api.Use(middleware.BlockList([]string{
+		"/api/internal",
+		"/api/search/inner",
+		"/api/notify/inner",
+	}))
 	api.Use(middleware.RateLimit(g.limiter))
 	api.Use(middleware.TrafficStats(g.stats))
 	api.Any("/*path", proxyHandler)

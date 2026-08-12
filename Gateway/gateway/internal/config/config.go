@@ -20,6 +20,7 @@ type Config struct {
 	GRPC           GRPCConfig           `yaml:"grpc"`
 	TCP            TCPConfig            `yaml:"tcp"`
 	Security       SecurityConfig       `yaml:"security"`
+	CORS           CORSConfig           `yaml:"cors"`
 	JWT            JWTConfig            `yaml:"jwt"`
 	Tenants        []string             `yaml:"tenants"`
 	Redis          RedisConfig          `yaml:"redis"`
@@ -86,6 +87,12 @@ type UpstreamConfig struct {
 
 type SecurityConfig struct {
 	IPBlocklist []string `yaml:"ip_blocklist"` // IP 黑名单
+}
+
+// CORSConfig 浏览器跨域白名单。未命中的 Origin 不写 Allow-Origin。
+type CORSConfig struct {
+	AllowedOrigins   []string `yaml:"allowed_origins"`
+	AllowCredentials bool     `yaml:"allow_credentials"` // 仅白名单命中时写入
 }
 
 type CircuitBreakerConfig struct {
@@ -187,7 +194,14 @@ func defaultConfig() *Config {
 			TokenTTL: "24h",
 		},
 		Tenants: []string{"tenant-a", "tenant-b"},
-		Redis:   RedisConfig{Addr: "localhost:6379"},
+		CORS: CORSConfig{
+			AllowedOrigins: []string{
+				"http://localhost:5173",
+				"http://127.0.0.1:5173",
+			},
+			AllowCredentials: true,
+		},
+		Redis: RedisConfig{Addr: "localhost:6379"},
 		RateLimit: RateLimitConfig{
 			Rate:       5,
 			Capacity:   5,

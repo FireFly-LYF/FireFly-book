@@ -7,6 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Login 曾用于 POST /gateway/login（仅校验租户名即签发 JWT）。
+// 路由已在 Register 中禁用，保留函数供测试/文档对照，勿重新挂载到生产。
 func (g *Gateway) Login(c *gin.Context) {
 	var req struct {
 		Tenant string `json:"tenant"`
