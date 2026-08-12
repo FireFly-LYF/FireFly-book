@@ -2,6 +2,8 @@ package userservice.service;
 
 import userservice.entity.User;
 import userservice.mapper.UserMapper;
+import userservice.mq.UserIndexEvent;
+import userservice.mq.UserIndexEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
@@ -11,9 +13,11 @@ import java.nio.charset.StandardCharsets;
 public class UserService {
 
     private final UserMapper userMapper;
+    private final UserIndexEventPublisher userIndexEventPublisher;
 
-    public UserService(UserMapper userMapper) {
+    public UserService(UserMapper userMapper, UserIndexEventPublisher userIndexEventPublisher) {
         this.userMapper = userMapper;
+        this.userIndexEventPublisher = userIndexEventPublisher;
     }
 
     public User register(String username, String password, String nickname) {
@@ -26,6 +30,11 @@ public class UserService {
         u.setPassword(DigestUtils.md5DigestAsHex(password.getBytes(StandardCharsets.UTF_8)));
         u.setNickname(nickname);
         userMapper.insert(u);
+
+        // 注册成功 → MQ → search 写 users 索引，之后可按昵称搜到
+        userIndexEventPublisher.publishUpserted(
+                UserIndexEvent.from(u.getId(), u.getUsername(), u.getNickname(), u.getAvatarUrl()));
+
         u.setPassword(null); // 返回前抹掉密码
         return u;
     }
@@ -68,6 +77,11 @@ public class UserService {
             u.setBio(bio);
         }
         userMapper.updateProfile(u);
+
+        // 昵称/头像变更后覆盖写 ES
+        userIndexEventPublisher.publishUpserted(
+                UserIndexEvent.from(u.getId(), u.getUsername(), u.getNickname(), u.getAvatarUrl()));
+
         u.setPassword(null);
         return u;
     }

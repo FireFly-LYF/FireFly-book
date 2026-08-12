@@ -1,0 +1,17 @@
+server:
+  port: 0
+
+spring:
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+  autoconfigure:
+    exclude: []
+
+firefly:
+  elasticsearch:
+    base-url: http://127.0.0.1:9200
+    note-index: notes-test
+    user-index: users-test

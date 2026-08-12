@@ -2,11 +2,18 @@ server:
   port: 9002
 
 spring:
+  application:
+    name: content-service
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/content?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
 
 mybatis:
   configuration:

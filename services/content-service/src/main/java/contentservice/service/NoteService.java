@@ -7,8 +7,13 @@ import contentservice.entity.Note;
 import contentservice.entity.NoteMedia;
 import contentservice.mapper.NoteMapper;
 import contentservice.mapper.NoteMediaMapper;
+import contentservice.mq.MqConstants;
+import contentservice.mq.NoteEventPublisher;
+import contentservice.mq.NoteIndexEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
@@ -17,13 +22,18 @@ public class NoteService {
 
     private final NoteMapper noteMapper;
     private final NoteMediaMapper noteMediaMapper;
+    private final NoteEventPublisher noteEventPublisher;
 
-    public NoteService(NoteMapper noteMapper, NoteMediaMapper noteMediaMapper) {
+    public NoteService(NoteMapper noteMapper, NoteMediaMapper noteMediaMapper, NoteEventPublisher noteEventPublisher) {
         this.noteMapper = noteMapper;
         this.noteMediaMapper = noteMediaMapper;
+        this.noteEventPublisher = noteEventPublisher;
     }
 
-    /** 发笔记：事务内写 note + note_media */
+    /**
+     * 发笔记：事务内写 note + note_media；提交后再发 MQ，由 search 异步写 ES。
+     * 不在这里 HTTP 调 search，避免拖慢发笔记、也避免 search 挂掉导致发帖失败。
+     */
     @Transactional
     public NoteDetailResponse create(Long userId, CreateNoteRequest req) {
         Note n = new Note();
@@ -44,6 +54,12 @@ public class NoteService {
                 noteMediaMapper.insert(m);
             }
         }
+
+        // 必须等事务提交后再发消息，否则消费者可能读到「库里还没有」的旧状态
+        publishAfterCommit(
+                MqConstants.RK_NOTE_CREATED,
+                NoteIndexEvent.from(n.getId(), n.getUserId(), n.getTitle(), n.getContent(), n.getCoverUrl()));
+
         return toDetail(n.getId());
     }
 
@@ -83,7 +99,16 @@ public class NoteService {
             n.setCoverUrl(req.getCoverUrl());
         }
         noteMapper.update(n);
-        return noteMapper.findById(noteId);
+        Note updated = noteMapper.findById(noteId);
+
+        // 更新后覆盖写 ES，保证搜到的是最新标题/正文
+        noteEventPublisher.publish(
+                MqConstants.RK_NOTE_UPDATED,
+                NoteIndexEvent.from(
+                        updated.getId(), updated.getUserId(),
+                        updated.getTitle(), updated.getContent(), updated.getCoverUrl()));
+
+        return updated;
     }
 
     @Transactional
@@ -91,6 +116,25 @@ public class NoteService {
         requireOwned(userId, noteId);
         noteMediaMapper.deleteByNoteId(noteId);
         noteMapper.delete(noteId);
+
+        // 删库提交后再删 ES，避免「库没有了还能搜到」
+        publishAfterCommit(MqConstants.RK_NOTE_DELETED, NoteIndexEvent.deleted(noteId));
+    }
+
+    /**
+     * 有事务则 afterCommit 再发；无事务（如 update 未标 @Transactional）则立刻发。
+     */
+    private void publishAfterCommit(String routingKey, NoteIndexEvent event) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    noteEventPublisher.publish(routingKey, event);
+                }
+            });
+        } else {
+            noteEventPublisher.publish(routingKey, event);
+        }
     }
 
     private NoteDetailResponse toDetail(Long noteId) {

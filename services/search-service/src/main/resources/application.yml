@@ -1,0 +1,18 @@
+server:
+  port: 9007
+
+spring:
+  application:
+    name: search-service
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+
+# ES 走 HTTP REST（教程推荐的上手方式，不引入重型 Java Client）
+firefly:
+  elasticsearch:
+    base-url: http://127.0.0.1:9200
+    note-index: notes
+    user-index: users

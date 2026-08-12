@@ -24,6 +24,12 @@ public class RabbitConfig {
         return new DirectExchange(MqConstants.EXCHANGE, true, false);
     }
 
+    /** 用户资料 → search；队列由 search 声明绑定 */
+    @Bean
+    public DirectExchange userExchange() {
+        return new DirectExchange(MqConstants.EXCHANGE_USER, true, false);
+    }
+
     @Bean
     public Queue notifyQueue() {
         return QueueBuilder.durable(MqConstants.QUEUE_NOTIFY).build();
