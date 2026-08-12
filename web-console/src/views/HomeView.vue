@@ -1,20 +1,20 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
 import NoteCard from '../components/NoteCard.vue'
-import TodoBadge from '../components/TodoBadge.vue'
 import { feedApi, noteApi, socialApi, userApi } from '../api'
 
 const props = defineProps({
   userId: { type: Number, default: null },
   loggedIn: Boolean,
 })
-const emit = defineEmits(['open-note', 'need-login', 'search'])
+const emit = defineEmits(['open-note', 'need-login', 'search', 'open-profile'])
 
 const channel = ref('discover')
 const loading = ref(false)
 const notes = ref([])
 const likes = ref({})
 const names = ref({})
+const avatars = ref({})
 const tip = ref('')
 
 const DEMO_NOTES = [
@@ -23,7 +23,7 @@ const DEMO_NOTES = [
     demo: true,
     userId: 0,
     title: '发现流接入 feed-service',
-    content: '全局推荐/发现流后端尚未实现',
+    content: '全局推荐/发现流后端尚未实现；登录后可看关注流',
     coverUrl: '',
   },
   {
@@ -31,7 +31,7 @@ const DEMO_NOTES = [
     demo: true,
     userId: 0,
     title: '搜索笔记与用户',
-    content: '点顶栏搜索框，经 Gateway 调用 search-service',
+    content: '点顶栏搜索，试「穿搭」「美食」「咖啡」',
     coverUrl: '',
   },
   {
@@ -133,6 +133,10 @@ async function ensureNames(userIds) {
           ...names.value,
           [uid]: user.nickname || user.username || `用户${uid}`,
         }
+        avatars.value = {
+          ...avatars.value,
+          [uid]: user.avatarUrl || '',
+        }
       }
     }),
   )
@@ -168,7 +172,7 @@ function openNote(note) {
         <button type="button" :class="{ on: channel === 'follow' }" @click="channel = 'follow'">关注</button>
         <button type="button" :class="{ on: channel === 'discover' }" @click="channel = 'discover'">发现</button>
         <button type="button" :class="{ on: channel === 'nearby' }" @click="channel = 'nearby'">
-          附近 <TodoBadge />
+          附近
         </button>
       </div>
       <button type="button" class="search mobile-search" @click="$emit('search')" aria-label="搜索">
@@ -180,8 +184,7 @@ function openNote(note) {
     <p v-if="loading" class="tip">加载中…</p>
 
     <div v-if="channel === 'nearby'" class="empty">
-      <p>附近笔记</p>
-      <TodoBadge text="LBS / 附近流待实现" />
+      <p>附近笔记即将上线</p>
     </div>
 
     <div v-else class="xhs-waterfall">
@@ -191,8 +194,10 @@ function openNote(note) {
         :note="n"
         :demo="!!n.demo"
         :author-name="n.demo ? 'FireFly' : names[n.userId]"
+        :author-avatar="n.demo ? '/avatars/ff-01.svg' : avatars[n.userId]"
         :like-count="likes[n.id] || 0"
         @open="openNote"
+        @open-profile="(uid) => $emit('open-profile', uid)"
       />
     </div>
   </div>

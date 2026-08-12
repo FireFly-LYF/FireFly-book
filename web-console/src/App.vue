@@ -17,6 +17,7 @@ const showSearch = ref(false)
 const session = ref(loadAuthSession())
 const loginOpen = ref(false)
 const detailId = ref(null)
+const viewingUserId = ref(null)
 const unread = ref(0)
 const toast = ref('')
 let toastTimer = null
@@ -55,11 +56,13 @@ function onLoginSuccess(data) {
 function logout() {
   saveSession(null)
   unread.value = 0
+  viewingUserId.value = null
   showToast('已退出')
 }
 
 function onNav(id) {
   showSearch.value = false
+  if (id === 'me') viewingUserId.value = null
   tab.value = id
 }
 
@@ -67,7 +70,22 @@ function openNote(id) {
   detailId.value = id
 }
 
+function openProfile(uid) {
+  if (!uid) return
+  const id = Number(uid)
+  if (!id) return
+  showSearch.value = false
+  detailId.value = null
+  viewingUserId.value = id
+  tab.value = 'me'
+}
+
+function backFromProfile() {
+  viewingUserId.value = null
+}
+
 function onPublished(note) {
+  viewingUserId.value = null
   tab.value = 'me'
   const id = note?.id ?? note?.note?.id
   if (id) detailId.value = id
@@ -75,6 +93,11 @@ function onPublished(note) {
 
 function setUnread(n) {
   unread.value = Number(n) || 0
+}
+
+function onProfileUpdated(user) {
+  if (!session.value?.token || !user) return
+  saveSession({ token: session.value.token, user })
 }
 </script>
 
@@ -86,6 +109,8 @@ function setUnread(n) {
       :unread="unread"
       :logged-in="loggedIn"
       :display-name="displayName"
+      :avatar-url="session?.user?.avatarUrl || ''"
+      :user-id="userId"
       @change="onNav"
       @search="showSearch = true"
       @login="needLogin"
@@ -99,6 +124,7 @@ function setUnread(n) {
           :logged-in="loggedIn"
           @back="showSearch = false"
           @open-note="openNote"
+          @open-profile="openProfile"
           @need-login="needLogin"
           @toast="showToast"
         />
@@ -107,6 +133,7 @@ function setUnread(n) {
           :user-id="userId"
           :logged-in="loggedIn"
           @open-note="openNote"
+          @open-profile="openProfile"
           @need-login="needLogin"
           @search="showSearch = true"
         />
@@ -125,14 +152,19 @@ function setUnread(n) {
           @need-login="needLogin"
           @toast="showToast"
           @unread="setUnread"
+          @open-profile="openProfile"
         />
         <ProfileView
           v-else
           :session="session"
+          :profile-user-id="viewingUserId"
           @need-login="needLogin"
           @logout="logout"
           @open-note="openNote"
+          @open-profile="openProfile"
+          @back="backFromProfile"
           @toast="showToast"
+          @profile-updated="onProfileUpdated"
         />
       </main>
     </div>
@@ -152,6 +184,7 @@ function setUnread(n) {
       @close="detailId = null"
       @need-login="needLogin"
       @toast="showToast"
+      @open-profile="openProfile"
     />
 
     <LoginSheet

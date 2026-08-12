@@ -1,25 +1,24 @@
 <script setup>
-import { computed } from 'vue'
-import TodoBadge from './TodoBadge.vue'
+import UserAvatar from './UserAvatar.vue'
 
 const props = defineProps({
   active: { type: String, required: true },
   unread: { type: Number, default: 0 },
   loggedIn: Boolean,
   displayName: { type: String, default: '' },
+  avatarUrl: { type: String, default: '' },
+  userId: { type: [Number, String], default: null },
 })
 
 defineEmits(['change', 'search', 'login', 'logout'])
 
 const links = [
   { id: 'home', label: '发现' },
-  { id: 'market', label: '市集', todo: true },
+  { id: 'market', label: '市集' },
   { id: 'publish', label: '发布' },
   { id: 'msg', label: '消息' },
   { id: 'me', label: '我' },
 ]
-
-const initial = computed(() => (props.displayName || 'U').slice(0, 1))
 </script>
 
 <template>
@@ -37,7 +36,6 @@ const initial = computed(() => (props.displayName || 'U').slice(0, 1))
           @click="$emit('change', item.id)"
         >
           {{ item.label }}
-          <TodoBadge v-if="item.todo" />
           <i v-if="item.id === 'msg' && unread > 0" class="badge">{{ unread > 99 ? '99+' : unread }}</i>
         </button>
       </nav>
@@ -45,14 +43,13 @@ const initial = computed(() => (props.displayName || 'U').slice(0, 1))
       <button type="button" class="search" @click="$emit('search')">
         <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M10.5 3a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zm7.2 11.1 3.5 3.5-1.4 1.4-3.5-3.5 1.4-1.4z"/></svg>
         <span>搜索笔记、用户</span>
-        <TodoBadge />
       </button>
 
       <div class="right">
         <button type="button" class="pub" @click="$emit('change', 'publish')">发布笔记</button>
         <template v-if="loggedIn">
           <button type="button" class="user" @click="$emit('change', 'me')" :title="displayName">
-            <span class="av">{{ initial }}</span>
+            <UserAvatar :user-id="userId" :avatar-url="avatarUrl" :name="displayName" :size="28" />
             <span class="name">{{ displayName }}</span>
           </button>
           <button type="button" class="out" @click="$emit('logout')">退出</button>

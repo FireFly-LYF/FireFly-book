@@ -1,22 +1,20 @@
 <script setup>
-import TodoBadge from '../components/TodoBadge.vue'
 </script>
 
 <template>
   <div class="market">
     <header>
       <strong>市集</strong>
-      <TodoBadge text="电商待实现" />
     </header>
     <div class="hero">
       <h2>FireFly 市集</h2>
-      <p>仿小红书购物频道：商品卡、直播入口、订单中心</p>
+      <p>购物频道即将上线：商品卡、直播入口、订单中心</p>
     </div>
     <div class="grid">
       <article v-for="i in 4" :key="i" class="sku">
         <div class="ph" />
         <h3>示例商品 {{ i }}</h3>
-        <p>¥ — <TodoBadge /></p>
+        <p>¥ —</p>
       </article>
     </div>
   </div>

@@ -1,17 +1,18 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
-import TodoBadge from '../components/TodoBadge.vue'
 import { notifyApi, userApi } from '../api'
+import UserAvatar from '../components/UserAvatar.vue'
 
 const props = defineProps({
   loggedIn: Boolean,
   userId: { type: [Number, null], default: null },
 })
-const emit = defineEmits(['need-login', 'toast', 'unread'])
+const emit = defineEmits(['need-login', 'toast', 'unread', 'open-profile'])
 
 const tab = ref('notify')
 const list = ref([])
 const names = ref({})
+const avatars = ref({})
 const loading = ref(false)
 
 const typeLabel = { LIKE: '赞了你', COMMENT: '评论了你', FOLLOW: '关注了你' }
@@ -57,6 +58,7 @@ async function ensureNicks(ids) {
       if (res.body?.code === 0) {
         const u = res.body.data
         names.value = { ...names.value, [id]: u.nickname || u.username || `用户${id}` }
+        avatars.value = { ...avatars.value, [id]: u.avatarUrl || '' }
       }
     }),
   )
@@ -85,16 +87,13 @@ async function markAll() {
     <header>
       <div class="tabs">
         <button type="button" :class="{ on: tab === 'notify' }" @click="tab = 'notify'">通知</button>
-        <button type="button" :class="{ on: tab === 'chat' }" @click="tab = 'chat'">
-          私信 <TodoBadge />
-        </button>
+        <button type="button" :class="{ on: tab === 'chat' }" @click="tab = 'chat'">私信</button>
       </div>
       <button v-if="tab === 'notify'" type="button" class="all" @click="markAll">全部已读</button>
     </header>
 
     <div v-if="tab === 'chat'" class="empty">
-      <p>私信会话列表</p>
-      <TodoBadge text="IM / 私信待实现" />
+      <p>私信功能即将上线</p>
     </div>
 
     <template v-else>
@@ -102,15 +101,22 @@ async function markAll() {
       <p v-else-if="loading" class="tip">加载中…</p>
       <ul v-else-if="list.length" class="list">
         <li v-for="n in list" :key="n.id" :class="{ unread: !n.isRead }">
-          <span class="av">{{ nick(n.fromUserId).slice(0, 1) }}</span>
-          <div class="body">
-            <div>
-              <strong>{{ nick(n.fromUserId) }}</strong>
-              {{ typeLabel[n.type] || n.type }}
-              <span class="muted">{{ n.content || '' }}</span>
+          <button type="button" class="hit" @click="$emit('open-profile', n.fromUserId)">
+            <UserAvatar
+              :user-id="n.fromUserId"
+              :avatar-url="avatars[n.fromUserId] || ''"
+              :name="nick(n.fromUserId)"
+              :size="40"
+            />
+            <div class="body">
+              <div>
+                <strong>{{ nick(n.fromUserId) }}</strong>
+                {{ typeLabel[n.type] || n.type }}
+                <span class="muted">{{ n.content || '' }}</span>
+              </div>
+              <div class="muted">#{{ n.id }} · {{ n.createdAt || '' }}</div>
             </div>
-            <div class="muted">#{{ n.id }} · {{ n.createdAt || '' }}</div>
-          </div>
+          </button>
           <button v-if="!n.isRead" type="button" class="read" @click="markOne(n.id)">已读</button>
         </li>
       </ul>
@@ -175,6 +181,20 @@ header {
 }
 
 .list li.unread { background: #fff8f9; }
+
+.hit {
+  flex: 1;
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  min-width: 0;
+}
 
 .av {
   width: 40px;

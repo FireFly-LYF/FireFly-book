@@ -1,11 +1,12 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { searchApi, toLocalMediaUrl } from '../api'
+import UserAvatar from '../components/UserAvatar.vue'
 
 const props = defineProps({
   loggedIn: Boolean,
 })
-const emit = defineEmits(['back', 'open-note', 'need-login', 'toast'])
+const emit = defineEmits(['back', 'open-note', 'open-profile', 'need-login', 'toast'])
 
 const HISTORY_KEY = 'ff-search-history'
 const hot = ['穿搭', '美食探店', '旅行攻略', '数码测评', '家居改造']
@@ -114,10 +115,6 @@ function snippet(text, max = 72) {
   return t.length > max ? `${t.slice(0, max)}…` : t
 }
 
-function avatarOf(u) {
-  return toLocalMediaUrl(u?.avatarUrl)
-}
-
 function coverOf(n) {
   return toLocalMediaUrl(n?.coverUrl)
 }
@@ -192,15 +189,18 @@ function coverOf(n) {
       <template v-else>
         <p v-if="!users.length" class="muted pad">没有相关用户</p>
         <ul v-else class="user-list">
-          <li v-for="u in users" :key="u.id" class="user-row">
-            <div class="u-avatar" :class="{ empty: !avatarOf(u) }">
-              <img v-if="avatarOf(u)" :src="avatarOf(u)" alt="" loading="lazy" />
-              <span v-else>{{ (u.nickname || u.username || 'U').slice(0, 1) }}</span>
-            </div>
-            <div class="u-info">
-              <strong>{{ u.nickname || u.username || `用户${u.id}` }}</strong>
-              <span>@{{ u.username || u.id }}</span>
-            </div>
+          <li v-for="u in users" :key="u.id">
+            <button type="button" class="user-row" @click="$emit('open-profile', u.id)">
+              <UserAvatar
+                :user="u"
+                :name="u.nickname || u.username || `用户${u.id}`"
+                :size="44"
+              />
+              <div class="u-info">
+                <strong>{{ u.nickname || u.username || `用户${u.id}` }}</strong>
+                <span>@{{ u.username || u.id }}</span>
+              </div>
+            </button>
           </li>
         </ul>
       </template>
@@ -412,11 +412,19 @@ h3 {
 }
 
 .user-row {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 0.85rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
 }
+
+.user-row:active { background: #fafafa; }
 
 .u-avatar {
   width: 44px;

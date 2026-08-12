@@ -2,6 +2,8 @@ package socialservice.mapper;
 
 import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
 @Mapper
 public interface NoteCollectMapper {
 
@@ -13,4 +15,10 @@ public interface NoteCollectMapper {
 
     @Select("SELECT COUNT(1) FROM note_collect WHERE note_id=#{noteId} AND user_id=#{userId}")
     int exists(@Param("noteId") Long noteId, @Param("userId") Long userId);
+
+    @Select("SELECT note_id FROM note_collect WHERE user_id=#{userId} ORDER BY created_at DESC LIMIT #{limit} OFFSET #{offset}")
+    List<Long> findNoteIdsByUser(
+            @Param("userId") Long userId,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
 }

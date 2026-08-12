@@ -59,6 +59,12 @@ export function userApi() {
       request(`/api/user/${id}`, {
         headers: authHeaders(),
       }),
+    updateMe: (data) =>
+      request('/api/user/me', {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      }),
     follow: (followeeId) =>
       request(`/api/user/follow/${followeeId}`, {
         method: 'POST',
@@ -142,6 +148,11 @@ export function socialApi() {
       request(`/api/social/like/${noteId}/me`, {
         headers: authHeaders(),
       }),
+    /** 某用户赞过的笔记 id 列表 */
+    likedOf: (userId, page = 1, size = 50) =>
+      request(`/api/social/like/of/${userId}?page=${page}&size=${size}`, {
+        headers: authHeaders(),
+      }),
     collect: (noteId) =>
       request(`/api/social/collect/${noteId}`, {
         method: 'POST',
@@ -151,6 +162,15 @@ export function socialApi() {
       request(`/api/social/collect/${noteId}`, {
         method: 'DELETE',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
+      }),
+    collectedByMe: (noteId) =>
+      request(`/api/social/collect/${noteId}/me`, {
+        headers: authHeaders(),
+      }),
+    /** 某用户收藏的笔记 id 列表 */
+    collectedOf: (userId, page = 1, size = 50) =>
+      request(`/api/social/collect/of/${userId}?page=${page}&size=${size}`, {
+        headers: authHeaders(),
       }),
     comment: (data) =>
       request('/api/social/comment', {

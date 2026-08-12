@@ -7,7 +7,7 @@ defineEmits(['change'])
 
 const items = [
   { id: 'home', label: '首页' },
-  { id: 'market', label: '市集', todo: true },
+  { id: 'market', label: '市集' },
   { id: 'publish', label: '发布', center: true },
   { id: 'msg', label: '消息' },
   { id: 'me', label: '我' },
@@ -36,7 +36,6 @@ const items = [
         </span>
         <span class="label">
           {{ item.label }}
-          <i v-if="item.todo" class="dot-todo" title="待实现" />
           <i v-if="item.id === 'msg' && unread > 0" class="badge">{{ unread > 99 ? '99+' : unread }}</i>
         </span>
       </template>

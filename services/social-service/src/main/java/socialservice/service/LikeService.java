@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 
 @Service
 public class LikeService {
@@ -68,6 +69,18 @@ public class LikeService {
 
     public boolean likedByMe(Long userId, Long noteId) {
         return noteLikeMapper.exists(noteId, userId) > 0;
+    }
+
+    /** 用户赞过的笔记 id（新赞在前） */
+    public List<Long> listLikedNoteIds(Long userId, int page, int size) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId 不能为空");
+        }
+        if (page < 1) page = 1;
+        if (size < 1) size = 20;
+        if (size > 100) size = 100;
+        int offset = (page - 1) * size;
+        return noteLikeMapper.findNoteIdsByUser(userId, offset, size);
     }
 
     private void incrCount(Long noteId) {

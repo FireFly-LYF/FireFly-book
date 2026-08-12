@@ -48,6 +48,7 @@ credentials.json
 logs/
 tmp/
 temp/
+tmp-covers/
 *.pid
 *.bak
 *.tmp

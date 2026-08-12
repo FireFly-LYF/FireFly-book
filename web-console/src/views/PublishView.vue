@@ -1,7 +1,6 @@
 <script setup>
 import { ref } from 'vue'
 import { mediaApi, noteApi, toLocalMediaUrl } from '../api'
-import TodoBadge from '../components/TodoBadge.vue'
 
 const props = defineProps({ loggedIn: Boolean })
 const emit = defineEmits(['need-login', 'toast', 'published'])
@@ -77,9 +76,9 @@ async function publish() {
     <textarea v-model="form.content" rows="8" placeholder="分享你的生活…" />
 
     <div class="tools">
-      <button type="button" class="chip" disabled>话题 <TodoBadge /></button>
-      <button type="button" class="chip" disabled>地点 <TodoBadge /></button>
-      <button type="button" class="chip" disabled>@用户 <TodoBadge /></button>
+      <button type="button" class="chip" disabled>话题</button>
+      <button type="button" class="chip" disabled>地点</button>
+      <button type="button" class="chip" disabled>@用户</button>
     </div>
   </div>
 </template>

@@ -1,14 +1,14 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { noteApi, socialApi, toLocalMediaUrl, userApi } from '../api'
-import TodoBadge from './TodoBadge.vue'
+import UserAvatar from './UserAvatar.vue'
 
 const props = defineProps({
   noteId: { type: [Number, String], default: null },
   open: Boolean,
   loggedIn: Boolean,
 })
-const emit = defineEmits(['close', 'need-login', 'toast'])
+const emit = defineEmits(['close', 'need-login', 'toast', 'open-profile'])
 
 const detail = ref(null)
 const author = ref(null)
@@ -56,13 +56,24 @@ async function load(id) {
 
 async function refreshSocial(id) {
   const api = socialApi()
-  const [c, me, list] = await Promise.all([
+  const [c, meLike, meCollect, list] = await Promise.all([
     api.likeCount(id),
     props.loggedIn ? api.likedByMe(id) : Promise.resolve({ body: null }),
+    props.loggedIn ? api.collectedByMe(id) : Promise.resolve({ body: null }),
     api.comments(id),
   ])
-  if (c.body?.code === 0) likeCount.value = c.body.data ?? 0
-  if (me.body?.code === 0) liked.value = !!me.body.data
+  if (c.body?.code === 0) {
+    const d = c.body.data
+    likeCount.value = typeof d === 'number' ? d : Number(d?.count ?? 0)
+  }
+  if (meLike.body?.code === 0) {
+    const d = meLike.body.data
+    liked.value = typeof d === 'boolean' ? d : !!d?.liked
+  }
+  if (meCollect.body?.code === 0) {
+    const d = meCollect.body.data
+    collected.value = typeof d === 'boolean' ? d : !!d?.collected
+  }
   if (list.body?.code === 0) {
     comments.value = list.body.data || []
     const ids = comments.value.map((x) => x.userId)
@@ -99,7 +110,10 @@ async function toggleLike() {
   if (res.body?.code === 0) {
     liked.value = !liked.value
     const c = await api.likeCount(props.noteId)
-    if (c.body?.code === 0) likeCount.value = c.body.data ?? 0
+    if (c.body?.code === 0) {
+      const d = c.body.data
+      likeCount.value = typeof d === 'number' ? d : Number(d?.count ?? 0)
+    }
   } else emit('toast', res.body?.message || '操作失败')
 }
 
@@ -127,6 +141,11 @@ async function sendComment() {
     await refreshSocial(props.noteId)
   } else emit('toast', res.body?.message || '评论失败')
 }
+function goAuthor() {
+  const uid = detail.value?.userId || author.value?.id
+  if (!uid) return
+  emit('open-profile', Number(uid))
+}
 </script>
 
 <template>
@@ -151,14 +170,19 @@ async function sendComment() {
             <h2>{{ detail.title || '无标题' }}</h2>
             <p class="text">{{ detail.content }}</p>
             <div class="author-row">
-              <span class="av">{{ (author?.nickname || 'U').slice(0, 1) }}</span>
-              <div>
-                <strong>{{ author?.nickname || author?.username || `用户${detail.userId}` }}</strong>
-                <div class="muted">id={{ detail.userId }} · 笔记 #{{ detail.id }}</div>
-              </div>
-              <button type="button" class="follow-btn" disabled>
-                关注 <TodoBadge text="列表内可用" />
+              <button type="button" class="author-hit" @click="goAuthor">
+                <UserAvatar
+                  :user="author"
+                  :user-id="detail.userId"
+                  :name="author?.nickname || author?.username || `用户${detail.userId}`"
+                  :size="36"
+                />
+                <div>
+                  <strong>{{ author?.nickname || author?.username || `用户${detail.userId}` }}</strong>
+                  <div class="muted">id={{ detail.userId }} · 笔记 #{{ detail.id }}</div>
+                </div>
               </button>
+              <button type="button" class="follow-btn" @click="goAuthor">主页</button>
             </div>
           </div>
 
@@ -286,6 +310,19 @@ h2 {
   gap: 0.6rem;
 }
 
+.author-hit {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  min-width: 0;
+}
+
 .av {
   width: 36px;
   height: 36px;
@@ -295,15 +332,19 @@ h2 {
   display: grid;
   place-items: center;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .follow-btn {
   margin-left: auto;
   padding: 0.35rem 0.7rem;
   border-radius: 14px;
-  background: #f5f5f5;
+  border: none;
+  background: var(--xhs-red);
+  color: #fff;
   font-size: 0.78rem;
-  color: var(--ink-2);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .comments {

@@ -4,6 +4,7 @@ import socialservice.common.ApiResponse;
 import socialservice.service.LikeService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -14,6 +15,19 @@ public class LikeController {
 
     public LikeController(LikeService likeService) {
         this.likeService = likeService;
+    }
+
+    /** 某用户赞过的笔记 id 列表（写在 /{noteId} 前，避免被当成 id） */
+    @GetMapping("/of/{userId}")
+    public ApiResponse<List<Long>> listByUser(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        try {
+            return ApiResponse.ok(likeService.listLikedNoteIds(userId, page, size));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.fail(40001, e.getMessage());
+        }
     }
 
     @PostMapping("/{noteId}")
