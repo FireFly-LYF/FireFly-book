@@ -190,6 +190,20 @@ export function feedApi() {
   }
 }
 
+/** 搜索：Gateway → search-service → ES */
+export function searchApi() {
+  return {
+    notes: (q, page = 1, size = 10) =>
+      request(`/api/search/note?q=${encodeURIComponent(q)}&page=${page}&size=${size}`, {
+        headers: authHeaders(),
+      }),
+    users: (q) =>
+      request(`/api/search/user?q=${encodeURIComponent(q)}`, {
+        headers: authHeaders(),
+      }),
+  }
+}
+
 /** 把后端绝对地址改成走 Vite 代理，便于页面预览 */
 export function toLocalMediaUrl(url) {
   if (!url) return ''

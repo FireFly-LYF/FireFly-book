@@ -94,7 +94,14 @@ function setUnread(n) {
 
     <div class="shell">
       <main class="main">
-        <SearchView v-if="showSearch" @back="showSearch = false" />
+        <SearchView
+          v-if="showSearch"
+          :logged-in="loggedIn"
+          @back="showSearch = false"
+          @open-note="openNote"
+          @need-login="needLogin"
+          @toast="showToast"
+        />
         <HomeView
           v-else-if="tab === 'home'"
           :user-id="userId"

@@ -30,8 +30,8 @@ const DEMO_NOTES = [
     id: 'demo-2',
     demo: true,
     userId: 0,
-    title: '搜索与热榜',
-    content: 'search-service 占位',
+    title: '搜索笔记与用户',
+    content: '点顶栏搜索框，经 Gateway 调用 search-service',
     coverUrl: '',
   },
   {
