@@ -27,8 +27,8 @@ async function submit() {
       err.value = res.body?.message || '失败'
       return
     }
-    if (!res.body?.data?.token || !res.body?.data?.user) {
-      err.value = '未返回 JWT，请重启 user-service'
+    if (!res.body?.data?.user || !(res.body.data.accessToken || res.body.data.token)) {
+      err.value = '未返回双令牌，请确认已建 refresh_token 表并重启 user-service'
       return
     }
     emit('success', res.body.data)

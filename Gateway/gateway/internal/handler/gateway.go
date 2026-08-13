@@ -49,10 +49,11 @@ func (g *Gateway) Register(r *gin.Engine) {
 	admin.GET("/statistic", g.GetStatistics)
 	admin.GET("/statistics/report", g.GetStatisticsReport)
 
-	// 业务登录/注册公开；其余 /api 默认强制 JWT（jwt.api_required）
+	// 业务登录/注册/刷新公开；其余 /api 默认强制 Access JWT（jwt.api_required）
 	publicAPI := map[string]struct{}{
 		"POST /api/user/register": {},
 		"POST /api/user/login":    {},
+		"POST /api/user/refresh":  {},
 	}
 	var apiAuth gin.HandlerFunc
 	if g.cfg.APIAuthRequired() {

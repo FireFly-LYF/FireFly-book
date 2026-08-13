@@ -13,8 +13,8 @@ tcp:
 
 jwt:
   secret: "phase3-dev-secret-change-me-32bytes!"
-  token_ttl: "24h"
-  # 业务 /api 强制 JWT；仅 POST /api/user/register|login 白名单放行
+  token_ttl: "30m"   # 与 user-service access-ttl 对齐（Access 短寿命）
+  # 业务 /api 强制 JWT；register|login|refresh 白名单放行
   api_required: true
 
 tenants:

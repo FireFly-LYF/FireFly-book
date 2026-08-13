@@ -28,6 +28,19 @@ CREATE TABLE IF NOT EXISTS `follow` (
   KEY idx_followee (`followee_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Access/Refresh 双令牌：仅存 refresh 的 SHA-256，明文只发给客户端一次
+CREATE TABLE IF NOT EXISTS `refresh_token` (
+  `id`                  BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `user_id`             BIGINT NOT NULL,
+  `token_hash`          CHAR(64) NOT NULL,
+  `device_fingerprint`  CHAR(64) NOT NULL COMMENT 'SHA-256 of client device id',
+  `expires_at`          DATETIME NOT NULL,
+  `revoked`             TINYINT NOT NULL DEFAULT 0,
+  `created_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_token_hash (`token_hash`),
+  KEY idx_user (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ========== content ==========
 CREATE DATABASE IF NOT EXISTS content DEFAULT CHARACTER SET utf8mb4;
 USE content;

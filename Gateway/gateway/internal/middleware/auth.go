@@ -53,6 +53,12 @@ func jwtAuth(secret []byte, required bool, skip map[string]struct{}) gin.Handler
 			c.Abort()
 			return
 		}
+		// 仅允许 Access；无 typ 的旧 Token 暂兼容；显式非 access（如误传 refresh JWT）拒绝
+		if claims.TokenType != "" && claims.TokenType != "access" {
+			c.JSON(401, gin.H{"code": 401, "msg": "access token required"})
+			c.Abort()
+			return
+		}
 		t := claims.Tenant()
 		if !tenant.IsValid(t) {
 			c.JSON(401, gin.H{"code": 401, "msg": "unknown tenant"})

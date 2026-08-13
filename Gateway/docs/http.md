@@ -15,24 +15,14 @@ netstat -ano | findstr :8080
 
 ---
 
-*JWT 流程*
-1. 登录认证（签发Token）
-用户将用户名+密码发送到服务端的登录接口。
-服务端验证通过后，生成一个JWT。这个Token由三部分组成（用.分隔）：
-Header（头部）：声明加密算法（如HS256）。
-Payload（载荷）：存放用户身份信息（如user_id）、过期时间等非敏感数据。
-Signature（签名）：将Header和Payload用密钥加密生成，用于防篡改。
-服务端将JWT字符串返回给客户端（通常放在响应体或Cookie中）。
+*JWT 流程（双令牌）*
+1. 登录/注册：user-service 返回 accessToken（短 JWT，typ=access）+ refreshToken（随机串，库内只存 SHA-256）
+2. 日常请求：Authorization: Bearer <accessToken> → 网关验签 → 注入 X-User-Id
+3. Access 过期（网关 401）：前端 POST /api/user/refresh（白名单）带 refreshToken + deviceFingerprint → 校验指纹一致并轮换 → 返回新双令牌
+4. 登出：POST /api/user/logout 撤销该用户全部 refresh
+注意：refresh 不能当 Bearer；网关拒绝 typ≠access 的 JWT；换设备/清站点数据导致指纹变 → 必须重新登录
 
-2. 客户端携带Token发请求
-客户端在后续每次请求的HTTP头中带上Token，格式为：
-Authorization: Bearer <JWT字符串>
-
-3. 服务端验证Token
-服务端收到请求后，取出JWT。
-用自己保存的密钥重新计算签名，与Token中的签名比对，不一致则拒绝。
-校验过期时间（exp字段），过期则拒绝。
-验证通过后，从Payload中读取用户身份，处理业务逻辑并返回数据。
+---
 
 *限流算法*
 1、 固定窗口

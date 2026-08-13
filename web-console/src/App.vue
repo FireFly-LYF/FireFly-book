@@ -10,7 +10,8 @@ import MessageView from './views/MessageView.vue'
 import ProfileView from './views/ProfileView.vue'
 import PublishView from './views/PublishView.vue'
 import SearchView from './views/SearchView.vue'
-import { loadAuthSession, saveAuthSession } from './api'
+import { loadAuthSession, saveAuthSession, normalizeAuthPayload, userApi } from './api'
+
 
 const tab = ref('home')
 const showSearch = ref(false)
@@ -23,14 +24,16 @@ const toast = ref('')
 let toastTimer = null
 
 const userId = computed(() => session.value?.user?.id ?? null)
-const loggedIn = computed(() => !!(session.value?.token && session.value?.user))
+const loggedIn = computed(() => {
+  const s = session.value
+  return !!(s?.user && (s.token || s.accessToken))
+})
 const displayName = computed(
   () => session.value?.user?.nickname || session.value?.user?.username || '',
 )
 
 function saveSession(auth) {
-  let next = null
-  if (auth?.token && auth?.user) next = { token: auth.token, user: auth.user }
+  const next = auth ? normalizeAuthPayload(auth) : null
   session.value = next
   saveAuthSession(next)
 }
@@ -53,7 +56,14 @@ function onLoginSuccess(data) {
   showToast('登录成功')
 }
 
-function logout() {
+async function logout() {
+  try {
+    if (session.value?.token || session.value?.accessToken) {
+      await userApi().logout()
+    }
+  } catch {
+    /* 忽略网络错误，本地仍清会话 */
+  }
   saveSession(null)
   unread.value = 0
   viewingUserId.value = null
@@ -96,8 +106,13 @@ function setUnread(n) {
 }
 
 function onProfileUpdated(user) {
-  if (!session.value?.token || !user) return
-  saveSession({ token: session.value.token, user })
+  if (!(session.value?.token || session.value?.accessToken) || !user) return
+  saveSession({
+    token: session.value.token || session.value.accessToken,
+    accessToken: session.value.accessToken || session.value.token,
+    refreshToken: session.value.refreshToken,
+    user,
+  })
 }
 </script>
 

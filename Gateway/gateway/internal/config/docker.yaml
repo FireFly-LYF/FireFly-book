@@ -10,7 +10,7 @@ tcp:
 
 jwt:
   secret: "phase3-dev-secret-change-me-32bytes!"
-  token_ttl: "24h"
+  token_ttl: "30m"
 
 tenants:
   - tenant-a

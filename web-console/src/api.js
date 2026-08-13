@@ -1,4 +1,5 @@
 const SESSION_KEY = 'ff-session'
+const DEVICE_KEY = 'ff-device-id'
 
 export function loadAuthSession() {
   try {
@@ -13,19 +14,95 @@ export function saveAuthSession(session) {
   else localStorage.removeItem(SESSION_KEY)
 }
 
-function getToken() {
-  return loadAuthSession()?.token || null
+/**
+ * 本浏览器档案级设备指纹：localStorage 持久 UUID。
+ * 换浏览器 / 清站点数据 = 新设备，Refresh 会失败，需重新登录。
+ */
+export function getDeviceFingerprint() {
+  let id = localStorage.getItem(DEVICE_KEY)
+  if (!id) {
+    id =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `ff-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+    localStorage.setItem(DEVICE_KEY, id)
+  }
+  return id
 }
 
-/** Bearer + 可选 Content-Type；网关验 JWT 后注入 X-User-Id */
+function withDevice(data = {}) {
+  return { ...data, deviceFingerprint: getDeviceFingerprint() }
+}
+
+/** 规范化登录/刷新返回：兼容 token / accessToken */
+export function normalizeAuthPayload(data) {
+  if (!data?.user) return null
+  const access = data.accessToken || data.token
+  if (!access) return null
+  return {
+    token: access,
+    accessToken: access,
+    refreshToken: data.refreshToken || loadAuthSession()?.refreshToken || null,
+    user: data.user,
+  }
+}
+
+function getAccessToken() {
+  const s = loadAuthSession()
+  return s?.accessToken || s?.token || null
+}
+
+/** Bearer + 可选 Content-Type；网关验 Access JWT 后注入 X-User-Id */
 export function authHeaders(extra = {}) {
   const headers = { ...extra }
-  const token = getToken()
+  const token = getAccessToken()
   if (token) headers.Authorization = `Bearer ${token}`
   return headers
 }
 
-async function request(url, options = {}) {
+let refreshPromise = null
+
+function isAuthPublicPath(url) {
+  return (
+    url.includes('/api/user/login') ||
+    url.includes('/api/user/register') ||
+    url.includes('/api/user/refresh')
+  )
+}
+
+/** 单飞刷新：并发 401 只打一次 /refresh（须带同设备指纹） */
+async function refreshAccessToken() {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = (async () => {
+    const session = loadAuthSession()
+    if (!session?.refreshToken) return false
+    const res = await fetch('/api/user/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(withDevice({ refreshToken: session.refreshToken })),
+    })
+    const text = await res.text()
+    let body
+    try {
+      body = text ? JSON.parse(text) : null
+    } catch {
+      return false
+    }
+    if (!res.ok || body?.code !== 0 || !body?.data) return false
+    const next = normalizeAuthPayload({
+      ...body.data,
+      user: body.data.user || session.user,
+    })
+    if (!next) return false
+    saveAuthSession(next)
+    return true
+  })().finally(() => {
+    refreshPromise = null
+  })
+  return refreshPromise
+}
+
+async function request(url, options = {}, allowRefresh = true) {
   const res = await fetch(url, options)
   const text = await res.text()
   let body
@@ -34,6 +111,19 @@ async function request(url, options = {}) {
   } catch {
     body = { raw: text }
   }
+
+  // 网关 HTTP 401：尝试 refresh 后重试一次
+  if (res.status === 401 && allowRefresh && !isAuthPublicPath(url)) {
+    const ok = await refreshAccessToken()
+    if (ok) {
+      const headers = { ...(options.headers || {}) }
+      const auth = authHeaders()
+      if (auth.Authorization) headers.Authorization = auth.Authorization
+      return request(url, { ...options, headers }, false)
+    }
+    saveAuthSession(null)
+  }
+
   return { ok: res.ok, status: res.status, body }
 }
 
@@ -43,13 +133,24 @@ export function userApi() {
       request('/api/user/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(withDevice(data)),
       }),
     login: (data) =>
       request('/api/user/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(withDevice(data)),
+      }),
+    refresh: (refreshToken) =>
+      request('/api/user/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(withDevice({ refreshToken })),
+      }),
+    logout: () =>
+      request('/api/user/logout', {
+        method: 'POST',
+        headers: authHeaders(),
       }),
     me: () =>
       request('/api/user/me', {
@@ -148,7 +249,6 @@ export function socialApi() {
       request(`/api/social/like/${noteId}/me`, {
         headers: authHeaders(),
       }),
-    /** 某用户赞过的笔记 id 列表 */
     likedOf: (userId, page = 1, size = 50) =>
       request(`/api/social/like/of/${userId}?page=${page}&size=${size}`, {
         headers: authHeaders(),
@@ -167,7 +267,6 @@ export function socialApi() {
       request(`/api/social/collect/${noteId}/me`, {
         headers: authHeaders(),
       }),
-    /** 某用户收藏的笔记 id 列表 */
     collectedOf: (userId, page = 1, size = 50) =>
       request(`/api/social/collect/of/${userId}?page=${page}&size=${size}`, {
         headers: authHeaders(),
@@ -200,7 +299,6 @@ export function notifyApi() {
   }
 }
 
-/** 关注流：feed-service 读扩散 */
 export function feedApi() {
   return {
     following: (size = 20) =>
@@ -210,7 +308,6 @@ export function feedApi() {
   }
 }
 
-/** 搜索：Gateway → search-service → ES */
 export function searchApi() {
   return {
     notes: (q, page = 1, size = 10) =>
@@ -224,7 +321,6 @@ export function searchApi() {
   }
 }
 
-/** 把后端绝对地址改成走 Vite 代理，便于页面预览 */
 export function toLocalMediaUrl(url) {
   if (!url) return ''
   return url
