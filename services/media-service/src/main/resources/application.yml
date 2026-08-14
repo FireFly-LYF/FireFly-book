@@ -11,7 +11,7 @@ spring:
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/media?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
-    password: 123456
+    password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 mybatis:
@@ -26,5 +26,5 @@ media:
 firefly:
   internal-auth:
     enabled: true
-    hmac-secret: firefly-internal-hmac-dev-change-me!
+    hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60

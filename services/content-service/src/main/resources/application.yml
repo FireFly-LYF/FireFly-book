@@ -9,13 +9,13 @@ spring:
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/content?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
-    password: 123456
+    password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
   rabbitmq:
     host: 127.0.0.1
     port: 5672
     username: guest
-    password: guest
+    password: ${RABBITMQ_PASSWORD}
 
 mybatis:
   configuration:
@@ -24,5 +24,5 @@ mybatis:
 firefly:
   internal-auth:
     enabled: true
-    hmac-secret: firefly-internal-hmac-dev-change-me!
+    hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60

@@ -1,6 +1,7 @@
 ﻿# FireFly-book one-click start (Windows PowerShell 5.1+)
 # Usage:
-#   .\start-all.ps1
+#   1. copy .env.example .env 并填写全部密钥（禁止空值）
+#   2. .\start-all.ps1
 #   .\start-all.ps1 -SkipFrontend
 #   .\start-all.ps1 -InfraOnly
 # Double-click: start-all.bat
@@ -18,9 +19,56 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
 
+$RequiredSecrets = @(
+    "JWT_SECRET",
+    "ADMIN_JWT_SECRET",
+    "ADMIN_PASSWORD",
+    "INTERNAL_HMAC_SECRET",
+    "MYSQL_PASSWORD",
+    "RABBITMQ_PASSWORD"
+)
+
 function Write-Step([string]$msg) {
     Write-Host ""
     Write-Host "==> $msg" -ForegroundColor Cyan
+}
+
+function Import-DotEnv([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $false
+    }
+    Get-Content -LiteralPath $Path -Encoding UTF8 | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith("#")) { return }
+        $eq = $line.IndexOf("=")
+        if ($eq -lt 1) { return }
+        $key = $line.Substring(0, $eq).Trim()
+        $val = $line.Substring($eq + 1).Trim()
+        if (($val.StartsWith('"') -and $val.EndsWith('"')) -or ($val.StartsWith("'") -and $val.EndsWith("'"))) {
+            $val = $val.Substring(1, $val.Length - 2)
+        }
+        Set-Item -Path ("Env:" + $key) -Value $val
+    }
+    return $true
+}
+
+function Assert-RequiredSecrets {
+    $missing = @()
+    foreach ($name in $RequiredSecrets) {
+        $v = [Environment]::GetEnvironmentVariable($name, "Process")
+        if ([string]::IsNullOrWhiteSpace($v)) {
+            $missing += $name
+        }
+    }
+    if ($missing.Count -gt 0) {
+        Write-Host "Missing required secrets (no defaults allowed):" -ForegroundColor Red
+        foreach ($m in $missing) { Write-Host "  - $m" -ForegroundColor Red }
+        Write-Host ""
+        Write-Host "Copy .env.example to .env, fill every value, then re-run." -ForegroundColor Yellow
+        Write-Host ("  copy `"{0}`" `"{1}`"" -f (Join-Path $Root ".env.example"), (Join-Path $Root ".env"))
+        exit 1
+    }
+    Write-Host ("  [OK] secrets loaded ({0} vars)" -f $RequiredSecrets.Count) -ForegroundColor Green
 }
 
 function Test-PortOpen([int]$Port) {
@@ -70,9 +118,16 @@ function Start-DockerContainer([string]$Name) {
 
 function Start-ConsoleJob([string]$Title, [string]$WorkDir, [string]$Command) {
     $ps = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+    # 显式把密钥写入子进程，避免部分环境下继承丢失
+    $envBlock = ($RequiredSecrets | ForEach-Object {
+        $v = [Environment]::GetEnvironmentVariable($_, "Process")
+        $escaped = $v -replace "'", "''"
+        "`$env:$_ = '$escaped'"
+    }) -join "; "
     $script = @"
 `$Host.UI.RawUI.WindowTitle = '$Title'
 Set-Location -LiteralPath '$WorkDir'
+$envBlock
 Write-Host '==== $Title ====' -ForegroundColor Cyan
 $Command
 Write-Host ''
@@ -88,6 +143,15 @@ Write-Host 'Process ended. You can close this window.' -ForegroundColor DarkGray
 
 Write-Host "FireFly-book start-all" -ForegroundColor Magenta
 Write-Host "Root: $Root"
+
+Write-Step "Load secrets from .env"
+$envFile = Join-Path $Root ".env"
+if (-not (Import-DotEnv -Path $envFile)) {
+    Write-Host ("  [FAIL] missing {0}" -f $envFile) -ForegroundColor Red
+    Write-Host "  copy .env.example to .env and fill all values (no defaults)." -ForegroundColor Yellow
+    exit 1
+}
+Assert-RequiredSecrets
 
 $mediaDir = "D:\FireFlyData\media"
 if (-not (Test-Path $mediaDir)) {
@@ -221,11 +285,11 @@ Write-Host "  UI        http://localhost:5173"
 Write-Host "  Gateway   http://localhost:8080/gateway/health"
 Write-Host "  MySQL     localhost:3306"
 Write-Host "  Redis     localhost:6379"
-Write-Host "  RabbitMQ  http://localhost:15672  (guest/guest)"
+Write-Host "  RabbitMQ  http://localhost:15672  (user guest / RABBITMQ_PASSWORD)"
 Write-Host "  ES        http://localhost:9200"
 Write-Host "  Java      127.0.0.1:9001-9007 (via Gateway only)"
 Write-Host ""
 Write-Host "  Stop:  .\stop-all.ps1" -ForegroundColor DarkGray
 Write-Host "  Infra: .\start-all.ps1 -InfraOnly"
+Write-Host "  Secrets: .env (from .env.example)" -ForegroundColor DarkGray
 Write-Host ""
-#http://localhost:5173

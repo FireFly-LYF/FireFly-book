@@ -21,4 +21,8 @@ public interface UserMapper {
     /** 改资料：由 Service 先合并非空字段再整行更新 */
     @Update("UPDATE user SET nickname=#{nickname}, avatar_url=#{avatarUrl}, bio=#{bio} WHERE id=#{id}")
     int updateProfile(User user);
+
+    /** 登录时将存量 MD5 升级为 BCrypt */
+    @Update("UPDATE user SET password=#{password} WHERE id=#{id}")
+    int updatePassword(@Param("id") Long id, @Param("password") String password);
 }

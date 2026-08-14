@@ -10,10 +10,10 @@
 
 | ID | 状态 | 风险（原问题） | 证据位置 | 当前结论 | 仍待做（若有） |
 |----|------|----------------|----------|----------|----------------|
-| S1 | **已修复** | Java 只信 `X-User-Id`、旁路可冒充 | 网关 `proxy/http.go`；`firefly-internal-auth`；各服务 `server.address` | ① 业务口仅绑 `127.0.0.1`（外网不可直连）② 网关注入并签名 `X-Gateway-Ts`/`X-Gateway-Sign`，下游校验（含时钟窗）③ 伪造裸 `X-User-Id` 会被 401 | HMAC 密钥仍硬编码在仓库（并入 **S3**）；生产换 Secret + 时钟同步 |
+| S1 | **已修复** | Java 只信 `X-User-Id`、旁路可冒充 | 网关 `proxy/http.go`；`firefly-internal-auth`；各服务 `server.address` | ① 业务口仅绑 `127.0.0.1`（外网不可直连）② 网关注入并签名 `X-Gateway-Ts`/`X-Gateway-Sign`，下游校验（含时钟窗）③ 伪造裸 `X-User-Id` 会被 401 | 生产换 Secret Manager + 时钟同步（密钥外置见 **S3**） |
 | S2 | **已缓解** | `/api/*/inner/**` 经网关对登录用户开放 | 网关 `BlockList`：`/api/search/inner`、`/api/notify/inner`、`/api/<svc>/inner/**` | 经网关访问 inner → **403**；旁路直连须过 S1 的 HMAC，不能再靠瞎填用户头 | 持有 `hmac-secret` 的同机调用仍可打 inner；生产可再加服务账号 / 仅 MQ |
-| S3 | 未改 | JWT / DB / MQ / **内部 HMAC** / **admin 口令与密钥** 硬编码进仓库 | 各 `application.yml`、`gateway.yaml` `jwt.secret` / `admin.*` / `internal_auth.hmac_secret` | 泄露可伪造业务/运维 Token、接管库与 MQ、签发合法网关身份头 | 环境变量 / Secret Manager；禁止默认值进生产镜像 |
-| S4 | 未改 | 密码 MD5 无盐 | `UserService.java`（注释已写应用 BCrypt） | 库泄露后易彩虹表/撞库 | BCrypt/Argon2 + 存量迁移 |
+| S3 | **已修复** | JWT / DB / MQ / HMAC / admin 密钥硬编码进仓库 | 各 `application.yml`、`gateway.yaml` 现为 `${ENV}`；`.env` + `start-all.ps1` 注入 | 配置无默认密钥；缺环境变量则启动失败 | 生产改用 Secret Manager；勿把 `.env` 提交进仓 |
+| S4 | **已修复** | 密码 MD5 无盐 | `UserService` + `spring-security-crypto` | 新注册走 BCrypt；旧 MD5 登录成功后自动升级写入 BCrypt | 无；可选后续去掉 MD5 兼容分支 |
 | S5 | **已修复** | 旧 `/gateway/login` 无真实凭证即可拿与业务同 secret 的 JWT | 现为运维口令登录；签发密钥为 `admin.jwt_secret` | 不能再「只填租户」拿业务级 Token | 口令/密钥外置见 **S3** |
 | S6 | **已修复** | 业务用户 JWT 可访问网关运维 API | `AdminJWTAuth(admin.jwt_secret)` + `typ=admin`；与 `jwt.secret` 强制不同 | 业务 Access 验签失败 → 401；运维须 `/gateway/login` + `admin.password` | 密钥外置（S3）；生产可再加 IP 限制 / mTLS |
 | S7 | **已修复** | CORS 反射任意 Origin | `cors.go` + `gateway.yaml` `cors.allowed_origins` | 仅白名单 Origin 可跨域；未命中不写 Allow-Origin，预检 403 | 生产把名单换成正式前端域名；空名单=最严 |
@@ -90,7 +90,7 @@
 
 ## 建议修复顺序
 
-1. **安全基线剩余**（S3、S4、S8、S9）：密钥外置（含 JWT/HMAC/admin）、BCrypt、媒体鉴权与校验  
+1. **安全基线剩余**（S8、S9）：媒体鉴权与校验  
 2. **媒体与部署**（D1–D2）：对象存储、配置外置、完整编排  
 3. **MQ 可靠**（M1–M3）：重试 + DLQ + Outbox/对账  
 4. **Feed/HTTP 韧性**（R1–R4）：超时、熔断、批量接口、限流调参  
@@ -102,6 +102,8 @@
 |----|----------|
 | **S1** | `127.0.0.1` 绑定 + 网关 HMAC 身份头 + `firefly-internal-auth` 统一校验 |
 | **S2** | 网关拦截 `/inner/**`（403）；旁路身份伪造由 S1 收口 |
+| **S3** | `application.yml`/`gateway.yaml` 密钥改 `${ENV}`；`start-all.ps1` 从 `.env` 注入且禁止空值 |
+| **S4** | 注册/登录改 BCrypt；存量 MD5 登录成功后自动升级 |
 | **S5** | `/gateway/login` 改为运维口令；不再签发业务密钥 JWT |
 | **S6** | 运维 API 使用独立 `admin.jwt_secret` + `typ=admin`，业务 Token 不可用 |
 | **S7** | CORS 改为 Origin 白名单 |

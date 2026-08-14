@@ -10,7 +10,7 @@ spring:
 firefly:
   internal-auth:
     enabled: true
-    hmac-secret: firefly-internal-hmac-dev-change-me!
+    hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
   user-base-url: http://127.0.0.1:9001
   content-base-url: http://127.0.0.1:9002

@@ -9,16 +9,16 @@ tcp:
   listen: ":8081"
 
 jwt:
-  secret: "phase3-dev-secret-change-me-32bytes!"
+  secret: "${JWT_SECRET}"
   token_ttl: "30m"
 
 admin:
-  jwt_secret: "firefly-admin-jwt-dev-change-me!"
-  password: "admin-dev-change-me"
+  jwt_secret: "${ADMIN_JWT_SECRET}"
+  password: "${ADMIN_PASSWORD}"
   token_ttl: "8h"
 
 internal_auth:
-  hmac_secret: "firefly-internal-hmac-dev-change-me!"
+  hmac_secret: "${INTERNAL_HMAC_SECRET}"
 
 tenants:
   - tenant-a
@@ -38,7 +38,7 @@ circuit_breaker:
 
 registry:
   type: mysql
-  dsn: "root:123456@tcp(mysql-gateway:3306)/gateway?parseTime=true"
+  dsn: "root:${MYSQL_PASSWORD}@tcp(mysql-gateway:3306)/gateway?parseTime=true"
 
 loadbalancer:
   strategy: consistent_hash

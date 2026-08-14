@@ -10,13 +10,13 @@ spring:
     host: 127.0.0.1
     port: 5672
     username: guest
-    password: guest
+    password: ${RABBITMQ_PASSWORD}
 
 # ES 走 HTTP REST（教程推荐的上手方式，不引入重型 Java Client）
 firefly:
   internal-auth:
     enabled: true
-    hmac-secret: firefly-internal-hmac-dev-change-me!
+    hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
   elasticsearch:
     base-url: http://127.0.0.1:9200

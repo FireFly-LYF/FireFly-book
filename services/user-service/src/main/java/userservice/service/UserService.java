@@ -4,6 +4,7 @@ import userservice.entity.User;
 import userservice.mapper.UserMapper;
 import userservice.mq.UserIndexEvent;
 import userservice.mq.UserIndexEventPublisher;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
@@ -14,6 +15,7 @@ public class UserService {
 
     private final UserMapper userMapper;
     private final UserIndexEventPublisher userIndexEventPublisher;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserMapper userMapper, UserIndexEventPublisher userIndexEventPublisher) {
         this.userMapper = userMapper;
@@ -26,8 +28,7 @@ public class UserService {
         }
         User u = new User();
         u.setUsername(username);
-        // 极简哈希，生产请用 BCrypt
-        u.setPassword(DigestUtils.md5DigestAsHex(password.getBytes(StandardCharsets.UTF_8)));
+        u.setPassword(passwordEncoder.encode(password));
         u.setNickname(nickname);
         userMapper.insert(u);
 
@@ -45,8 +46,15 @@ public class UserService {
         if (u == null) {
             return null;
         }
-        String hash = DigestUtils.md5DigestAsHex(password.getBytes(StandardCharsets.UTF_8));
-        if (!hash.equals(u.getPassword())) {
+        String stored = u.getPassword();
+        if (isBcrypt(stored)) {
+            if (!passwordEncoder.matches(password, stored)) {
+                return null;
+            }
+        } else if (matchesLegacyMd5(password, stored)) {
+            // 存量 MD5 校验通过后升级为 BCrypt，下次不再走 MD5
+            userMapper.updatePassword(u.getId(), passwordEncoder.encode(password));
+        } else {
             return null;
         }
         u.setPassword(null);
@@ -84,5 +92,18 @@ public class UserService {
 
         u.setPassword(null);
         return u;
+    }
+
+    private static boolean isBcrypt(String hash) {
+        return hash != null
+                && (hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$"));
+    }
+
+    private static boolean matchesLegacyMd5(String rawPassword, String storedHex) {
+        if (storedHex == null || storedHex.length() != 32) {
+            return false;
+        }
+        String md5 = DigestUtils.md5DigestAsHex(rawPassword.getBytes(StandardCharsets.UTF_8));
+        return md5.equalsIgnoreCase(storedHex);
     }
 }

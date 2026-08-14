@@ -132,12 +132,14 @@ type RegistryConfig struct {
 }
 
 // Load 读取 yaml 并完成校验与运行时初始化，是 config 包的唯一入口。
-// 流程：默认值 → yaml 覆盖 → validate → initRuntime
+// 流程：默认值 → 展开 ${ENV} → yaml 覆盖 → validate → initRuntime
+// 密钥必须由环境变量注入；未设置时 ExpandEnv 为空，validate 会失败。
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config %q: %w", path, err)
 	}
+	data = []byte(os.ExpandEnv(string(data)))
 
 	cfg := defaultConfig()
 	if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -214,16 +216,16 @@ func defaultConfig() *Config {
 			AuthRequired: true,
 		},
 		JWT: JWTConfig{
-			Secret:   "phase3-dev-secret-change-me",
+			Secret:   "", // 必须由 ${JWT_SECRET} 注入
 			TokenTTL: "24h",
 		},
 		Admin: AdminConfig{
-			JWTSecret: "firefly-admin-jwt-dev-change-me!",
-			Password:  "admin-dev-change-me",
+			JWTSecret: "", // ${ADMIN_JWT_SECRET}
+			Password:  "", // ${ADMIN_PASSWORD}
 			TokenTTL:  "8h",
 		},
 		InternalAuth: InternalAuthConfig{
-			HMACSecret: "firefly-internal-hmac-dev-change-me!",
+			HMACSecret: "", // ${INTERNAL_HMAC_SECRET}
 		},
 		Tenants: []string{"tenant-a", "tenant-b"},
 		CORS: CORSConfig{
