@@ -11,6 +11,16 @@ spring:
     port: 5672
     username: guest
     password: ${RABBITMQ_PASSWORD}
+    listener:
+      simple:
+        # 重试耗尽后 nack 且不 requeue → 走队列 DLX 进 DLQ
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-retries: 3
+          initial-interval: 1000ms
+          multiplier: 2.0
+          max-interval: 10000ms
 
 # ES 走 HTTP REST（教程推荐的上手方式，不引入重型 Java Client）
 firefly:

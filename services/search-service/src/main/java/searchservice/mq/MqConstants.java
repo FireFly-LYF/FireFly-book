@@ -10,9 +10,13 @@ public final class MqConstants {
     public static final String EXCHANGE_CONTENT = "firefly.content";
     /** 用户领域交换机（user-service 发） */
     public static final String EXCHANGE_USER = "firefly.user";
+    /** 死信交换机：重试耗尽 / nack(requeue=false) 后进入 */
+    public static final String EXCHANGE_DLX = "firefly.dlx";
 
     public static final String QUEUE_SEARCH_NOTE = "search.note.events";
     public static final String QUEUE_SEARCH_USER = "search.user.events";
+    public static final String QUEUE_SEARCH_NOTE_DLQ = "search.note.events.dlq";
+    public static final String QUEUE_SEARCH_USER_DLQ = "search.user.events.dlq";
 
     public static final String RK_NOTE_CREATED = "note.created";
     public static final String RK_NOTE_UPDATED = "note.updated";

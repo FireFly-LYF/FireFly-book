@@ -1,0 +1,30 @@
+{
+  "groups": [
+    {
+      "name": "firefly.elasticsearch",
+      "type": "searchservice.config.FireflyEsProperties",
+      "sourceType": "searchservice.config.FireflyEsProperties",
+      "description": "Elasticsearch HTTP REST 连接与索引名。"
+    }
+  ],
+  "properties": [
+    {
+      "name": "firefly.elasticsearch.base-url",
+      "type": "java.lang.String",
+      "description": "ES HTTP 地址，例如 http://127.0.0.1:9200。",
+      "sourceType": "searchservice.config.FireflyEsProperties"
+    },
+    {
+      "name": "firefly.elasticsearch.note-index",
+      "type": "java.lang.String",
+      "description": "笔记索引名。",
+      "sourceType": "searchservice.config.FireflyEsProperties"
+    },
+    {
+      "name": "firefly.elasticsearch.user-index",
+      "type": "java.lang.String",
+      "description": "用户索引名。",
+      "sourceType": "searchservice.config.FireflyEsProperties"
+    }
+  ]
+}

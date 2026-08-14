@@ -36,8 +36,27 @@ public class RabbitConfig {
     }
 
     @Bean
+    public DirectExchange dlxExchange() {
+        return new DirectExchange(MqConstants.EXCHANGE_DLX, true, false);
+    }
+
+    /** 与 notify-service 参数一致（含 DLX） */
+    @Bean
     public Queue notifyQueue() {
-        return QueueBuilder.durable(MqConstants.QUEUE_NOTIFY).build();
+        return QueueBuilder.durable(MqConstants.QUEUE_NOTIFY)
+                .deadLetterExchange(MqConstants.EXCHANGE_DLX)
+                .deadLetterRoutingKey(MqConstants.QUEUE_NOTIFY)
+                .build();
+    }
+
+    @Bean
+    public Queue notifyDlq() {
+        return QueueBuilder.durable(MqConstants.QUEUE_NOTIFY_DLQ).build();
+    }
+
+    @Bean
+    public Binding notifyDlqBinding(Queue notifyDlq, DirectExchange dlxExchange) {
+        return BindingBuilder.bind(notifyDlq).to(dlxExchange).with(MqConstants.QUEUE_NOTIFY);
     }
 
     @Bean

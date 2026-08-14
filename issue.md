@@ -26,8 +26,8 @@
 
 | ID | 状态 | 风险 | 证据位置 | 上线后果 | 建议方向 |
 |----|------|------|----------|----------|----------|
-| M1 | 未改 | 消费者吞异常后 ACK → 消息永久丢失 | `SearchEventListener` 等 catch 只打日志 | ES/通知短暂故障后索引永久落后 | 失败抛出重试；或 nack |
-| M2 | 未改 | 无 DLQ / 无重试退避配置 | 各 `RabbitConfig` 仅 durable queue | 毒消息/瞬时故障无法隔离恢复 | DLX/DLQ + 有限重试 + 告警 |
+| M1 | **已修复** | 消费者吞异常后 ACK → 消息永久丢失 | `SearchEventListener` / `NotifyEventListener` 失败上抛 | 瞬时失败走 listener retry；耗尽进 DLQ | 监控 DLQ；毒消息人工处理 |
+| M2 | **已修复** | 无 DLQ / 无重试退避配置 | 各队列挂 `firefly.dlx` + `*.dlq`；`retry.max-attempts=3` | 重试 3 次退避后进 DLQ，避免无限重投 | 本机旧队列需先删除再启动（参数变更） |
 | M3 | 未改 | 生产者发送失败只 warn，主流程仍成功 | `NoteEventPublisher`、`NotifyEventPublisher` 等 | 搜索/通知静默缺失，无补偿 | Transactional Outbox 或本地重试表 + 对账 |
 
 ---
@@ -92,7 +92,7 @@
 
 1. **安全基线剩余**：无（S1–S9 主路径已收口；生产密钥改 Secret Manager）  
 2. **媒体与部署**（D1–D2）：对象存储、配置外置、完整编排  
-3. **MQ 可靠**（M1–M3）：重试 + DLQ + Outbox/对账  
+3. **MQ 可靠剩余**（M3）：Transactional Outbox / 对账  
 4. **Feed/HTTP 韧性**（R1–R4）：超时、熔断、批量接口、限流调参  
 5. **可观测**（O1–O3）：真实 health、指标、TraceId  
 
@@ -109,5 +109,7 @@
 | **S7** | CORS 改为 Origin 白名单 |
 | **S8** | `/files/**` 签名 URL（exp+sig）；无签名 403 |
 | **S9** | 上传魔数 + 扩展名白名单 + 服务端决定扩展名 |
+| **M1** | Search/Notify 消费失败上抛，不再吞异常 ACK |
+| **M2** | 业务队列 DLX + DLQ；listener 重试 3 次退避 |
 
 网关侧既有正向设计（清客户端 `X-User-Id` 再注入、路由级熔断、笔记 create/delete 的 afterCommit）继续保留。
