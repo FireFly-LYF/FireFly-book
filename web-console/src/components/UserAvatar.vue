@@ -1,7 +1,8 @@
 <script setup>
 import { computed } from 'vue'
 import { resolveAvatarUrl } from '../avatars'
-import { toLocalMediaUrl } from '../api'
+import { isSignedMediaPath, toLocalMediaUrl } from '../api'
+import SignedImg from './SignedImg.vue'
 
 const props = defineProps({
   user: { type: Object, default: null },
@@ -20,6 +21,8 @@ const src = computed(() => {
   return toLocalMediaUrl(resolved) || resolved
 })
 
+const needsSign = computed(() => isSignedMediaPath(src.value))
+
 const letter = computed(() => (props.name || props.user?.nickname || props.user?.username || 'U').slice(0, 1))
 
 const boxStyle = computed(() => {
@@ -30,7 +33,14 @@ const boxStyle = computed(() => {
 
 <template>
   <span class="ua" :style="boxStyle" :title="name || undefined">
-    <img v-if="src" :src="src" alt="" loading="lazy" @error="$event.target.style.display='none'" />
+    <SignedImg v-if="needsSign" :src="src" alt="" loading="lazy" />
+    <img
+      v-else-if="src"
+      :src="src"
+      alt=""
+      loading="lazy"
+      @error="$event.target.style.display='none'"
+    />
     <span v-else class="letter">{{ letter }}</span>
   </span>
 </template>

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { toLocalMediaUrl } from '../api'
 import UserAvatar from './UserAvatar.vue'
+import SignedImg from './SignedImg.vue'
 
 const props = defineProps({
   note: { type: Object, required: true },
@@ -31,7 +32,7 @@ function onAuthorClick(e) {
 <template>
   <article class="card" @click="$emit('open', note)">
     <div class="cover" :class="{ empty: !cover }">
-      <img v-if="cover" :src="cover" :alt="title" loading="lazy" />
+      <SignedImg v-if="cover" :src="cover" :alt="title" loading="lazy" />
       <div v-else class="cover-ph">
         <span class="art">{{ artText }}</span>
       </div>

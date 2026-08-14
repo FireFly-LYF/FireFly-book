@@ -3,10 +3,13 @@ package mediaservice.service;
 import mediaservice.config.MediaProperties;
 import mediaservice.entity.MediaAsset;
 import mediaservice.mapper.MediaAssetMapper;
+import mediaservice.media.ImageProbe;
+import mediaservice.media.MediaUrlSigner;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -19,27 +22,40 @@ public class MediaService {
 
     private final MediaAssetMapper mediaAssetMapper;
     private final MediaProperties mediaProperties;
+    private final MediaUrlSigner mediaUrlSigner;
 
-    public MediaService(MediaAssetMapper mediaAssetMapper, MediaProperties mediaProperties) {
+    public MediaService(
+            MediaAssetMapper mediaAssetMapper,
+            MediaProperties mediaProperties,
+            MediaUrlSigner mediaUrlSigner) {
         this.mediaAssetMapper = mediaAssetMapper;
         this.mediaProperties = mediaProperties;
+        this.mediaUrlSigner = mediaUrlSigner;
     }
 
     public Map<String, Object> save(Long userId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("文件不能为空");
         }
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw new IllegalArgumentException("只允许上传图片");
+
+        byte[] head;
+        try (InputStream in = file.getInputStream()) {
+            head = in.readNBytes(32);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("无法读取文件");
         }
 
+        ImageProbe.DetectedImage detected = ImageProbe.detect(head)
+                .orElseThrow(() -> new IllegalArgumentException("只允许上传 JPEG/PNG/GIF/WEBP 图片"));
+
         String original = file.getOriginalFilename();
-        if (original == null || !original.contains(".")) {
-            throw new IllegalArgumentException("文件名无效");
+        // 客户端扩展名仅作提示，不参与落盘名
+        if (original != null && !original.isBlank() && !ImageProbe.isAllowedClientHint(original)) {
+            throw new IllegalArgumentException("文件扩展名不在白名单内");
         }
-        String ext = original.substring(original.lastIndexOf('.'));
-        String filename = UUID.randomUUID() + ext;
+
+        String filename = UUID.randomUUID() + detected.extension();
+        String canonicalPath = "/files/" + filename;
 
         try {
             Path dest = Paths.get(mediaProperties.getStorageDir(), filename);
@@ -49,27 +65,53 @@ public class MediaService {
             throw new IllegalStateException("保存文件失败: " + e.getMessage(), e);
         }
 
-        String publicBaseUrl = mediaProperties.getPublicBaseUrl();
-        String base = publicBaseUrl.endsWith("/")
-                ? publicBaseUrl.substring(0, publicBaseUrl.length() - 1)
-                : publicBaseUrl;
-        String url = base + "/" + filename;
-
         MediaAsset asset = new MediaAsset();
         asset.setUserId(userId);
-        asset.setOriginalName(original);
-        asset.setContentType(contentType);
+        asset.setOriginalName(original != null ? original : filename);
+        asset.setContentType(detected.contentType());
         asset.setSizeBytes(file.getSize());
-        asset.setUrl(url);
+        // 库内只存规范路径，不含签名（签名会过期）
+        asset.setUrl(canonicalPath);
         mediaAssetMapper.insert(asset);
 
         Map<String, Object> result = new HashMap<>();
         result.put("id", asset.getId());
-        result.put("url", url);
+        result.put("url", canonicalPath);
+        result.put("contentType", detected.contentType());
+        result.put("accessUrl", mediaUrlSigner.signPath(canonicalPath));
         return result;
     }
 
     public MediaAsset findById(Long id) {
         return mediaAssetMapper.findById(id);
+    }
+
+    /** 把规范路径或历史绝对 URL 转成 /files/... 再签名。 */
+    public String signAccessUrl(String rawUrl) {
+        String path = canonicalize(rawUrl);
+        return mediaUrlSigner.signPath(path);
+    }
+
+    public static String canonicalize(String rawUrl) {
+        if (rawUrl == null || rawUrl.isBlank()) {
+            throw new IllegalArgumentException("path 不能为空");
+        }
+        String u = rawUrl.trim();
+        int q = u.indexOf('?');
+        if (q >= 0) {
+            u = u.substring(0, q);
+        }
+        // 兼容历史：http://127.0.0.1:9003/files/xxx.jpg
+        int idx = u.indexOf("/files/");
+        if (idx >= 0) {
+            u = u.substring(idx);
+        }
+        if (!u.startsWith("/files/")) {
+            throw new IllegalArgumentException("非法媒体路径");
+        }
+        if (!MediaUrlSigner.isSafePath(u)) {
+            throw new IllegalArgumentException("非法媒体路径");
+        }
+        return u;
     }
 }

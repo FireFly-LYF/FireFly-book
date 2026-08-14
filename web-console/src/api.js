@@ -202,6 +202,15 @@ export function mediaApi() {
       request(`/api/media/${id}`, {
         headers: authHeaders(),
       }),
+    /** 为 /files/... 规范路径批量签发短期 accessUrl */
+    sign: (paths) =>
+      request('/api/media/sign', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          paths: Array.isArray(paths) ? paths : [paths],
+        }),
+      }),
   }
 }
 
@@ -323,7 +332,48 @@ export function searchApi() {
 
 export function toLocalMediaUrl(url) {
   if (!url) return ''
-  return url
+  let u = String(url)
     .replace('http://127.0.0.1:9003', '')
     .replace('http://localhost:9003', '')
+    .replace('http://127.0.0.1:8080', '')
+    .replace('http://localhost:8080', '')
+  const q = u.indexOf('?')
+  if (q >= 0) u = u.substring(0, q)
+  return u
+}
+
+/** 是否为需签名的媒体路径 */
+export function isSignedMediaPath(url) {
+  const p = toLocalMediaUrl(url)
+  return p.startsWith('/files/')
+}
+
+const signCache = new Map()
+
+/**
+ * 将规范 /files/... 换成带 exp+sig 的短期 URL（需登录）。
+ * 静态 /avatars 等原样返回。
+ */
+export async function resolveSignedMediaUrl(url) {
+  const path = toLocalMediaUrl(url)
+  if (!path) return ''
+  if (!path.startsWith('/files/')) return path
+
+  const now = Math.floor(Date.now() / 1000)
+  const hit = signCache.get(path)
+  if (hit && hit.exp > now + 60) {
+    return hit.accessUrl
+  }
+
+  const res = await mediaApi().sign([path])
+  if (res.body?.code !== 0) {
+    throw new Error(res.body?.message || '媒体签名失败')
+  }
+  const accessUrl = res.body.data?.urls?.[path] || res.body.data?.accessUrl || ''
+  if (!accessUrl) throw new Error('空 accessUrl')
+
+  const expMatch = /[?&]exp=(\d+)/.exec(accessUrl)
+  const exp = expMatch ? Number(expMatch[1]) : now + 3000
+  signCache.set(path, { accessUrl, exp })
+  return accessUrl
 }

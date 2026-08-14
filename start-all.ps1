@@ -24,6 +24,7 @@ $RequiredSecrets = @(
     "ADMIN_JWT_SECRET",
     "ADMIN_PASSWORD",
     "INTERNAL_HMAC_SECRET",
+    "MEDIA_SIGN_SECRET",
     "MYSQL_PASSWORD",
     "RABBITMQ_PASSWORD"
 )

@@ -29,10 +29,14 @@ ehthumbs.db
 .springBeans
 .sts4-cache
 
-# ----- 密钥与本地配置 -----
+# ----- 密钥与本地配置（.env 绝对不要入库） -----
 .env
 .env.*
 !.env.example
+*.env
+!*.env.example
+secrets.env
+secrets*.env
 *.local.properties
 *.local.yml
 *.local.yaml

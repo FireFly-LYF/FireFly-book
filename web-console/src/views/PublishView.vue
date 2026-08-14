@@ -1,11 +1,12 @@
 <script setup>
 import { ref } from 'vue'
 import { mediaApi, noteApi, toLocalMediaUrl } from '../api'
+import SignedImg from '../components/SignedImg.vue'
 
 const props = defineProps({ loggedIn: Boolean })
 const emit = defineEmits(['need-login', 'toast', 'published'])
 
-const form = ref({ title: '', content: '', coverUrl: '' })
+const form = ref({ title: '', content: '', coverUrl: '', accessUrl: '' })
 const uploading = ref(false)
 const publishing = ref(false)
 
@@ -20,8 +21,10 @@ async function onPick(e) {
       emit('toast', res.body?.message || '上传失败')
       return
     }
-    const url = res.body.data?.url || res.body.data?.accessUrl || ''
-    form.value.coverUrl = toLocalMediaUrl(url) || url
+    const data = res.body.data || {}
+    // 入库用规范路径；预览用签名 URL
+    form.value.coverUrl = toLocalMediaUrl(data.url) || data.url || ''
+    form.value.accessUrl = data.accessUrl || form.value.coverUrl
     emit('toast', '封面已上传')
   } finally {
     uploading.value = false
@@ -45,7 +48,7 @@ async function publish() {
       emit('toast', res.body?.message || '发布失败')
       return
     }
-    form.value = { title: '', content: '', coverUrl: '' }
+    form.value = { title: '', content: '', coverUrl: '', accessUrl: '' }
     emit('toast', '发布成功')
     emit('published', res.body.data)
   } finally {
@@ -65,7 +68,7 @@ async function publish() {
 
     <label class="cover">
       <input type="file" accept="image/*" hidden @change="onPick" />
-      <img v-if="form.coverUrl" :src="form.coverUrl" alt="封面" />
+      <SignedImg v-if="form.accessUrl || form.coverUrl" :src="form.accessUrl || form.coverUrl" alt="封面" />
       <div v-else class="ph">
         <span>{{ uploading ? '上传中…' : '添加封面图' }}</span>
         <small>走 media-service</small>

@@ -13,7 +13,7 @@ import java.io.IOException;
 
 /**
  * 校验网关注入的 X-Gateway-Ts / X-Gateway-Sign；拒绝伪造的 X-User-Id。
- * /health、/files/** 放行（探活与本地静态图）。
+ * /health 放行；/files/** 跳过网关身份头（由 media SignedFileFilter 验签名）。
  */
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class GatewayHmacFilter extends OncePerRequestFilter {

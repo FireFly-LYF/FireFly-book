@@ -6,10 +6,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class MediaProperties {
 
     /** 本地存储目录，如 D:/FireFlyData/media */
-    private String storageDir = "D:/A_Software/Java/SAVE/FireFly-book/save/media";
+    private String storageDir = "D:/FireFlyData/media";
 
-    /** 对外访问前缀，如 http://127.0.0.1:9003/files */
-    private String publicBaseUrl = "http://127.0.0.1:9003/files";
+    /**
+     * 对外访问前缀。推荐经网关：http://127.0.0.1:8080/files
+     * 入库只存相对路径 /files/{uuid}.ext；此前缀仅兼容旧逻辑。
+     */
+    private String publicBaseUrl = "http://127.0.0.1:8080/files";
+
+    /** 签名密钥，必须由环境变量 MEDIA_SIGN_SECRET 注入 */
+    private String signSecret;
+
+    /** 签名 URL 有效期（秒） */
+    private long signTtlSeconds = 3600;
 
     public String getStorageDir() {
         return storageDir;
@@ -25,5 +34,21 @@ public class MediaProperties {
 
     public void setPublicBaseUrl(String publicBaseUrl) {
         this.publicBaseUrl = publicBaseUrl;
+    }
+
+    public String getSignSecret() {
+        return signSecret;
+    }
+
+    public void setSignSecret(String signSecret) {
+        this.signSecret = signSecret;
+    }
+
+    public long getSignTtlSeconds() {
+        return signTtlSeconds;
+    }
+
+    public void setSignTtlSeconds(long signTtlSeconds) {
+        this.signTtlSeconds = signTtlSeconds;
     }
 }

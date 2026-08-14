@@ -21,7 +21,9 @@ mybatis:
 
 media:
   storage-dir: D:/FireFlyData/media
-  public-base-url: http://127.0.0.1:9003/files
+  public-base-url: http://127.0.0.1:8080/files
+  sign-secret: ${MEDIA_SIGN_SECRET}
+  sign-ttl-seconds: 3600
 
 firefly:
   internal-auth:

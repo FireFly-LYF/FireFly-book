@@ -72,7 +72,7 @@ routes:
         weight: 1
   - id: media-files
     prefix: /files
-    auth: false
+    auth: false   # 不强制 JWT；访问控制靠 media SignedFileFilter（exp+sig）
     upstreams:
       - http: http://127.0.0.1:9003
         weight: 1

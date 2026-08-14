@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { searchApi, toLocalMediaUrl } from '../api'
+import SignedImg from '../components/SignedImg.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 
 const props = defineProps({
@@ -174,7 +175,7 @@ function coverOf(n) {
           <li v-for="n in notes" :key="n.id">
             <button type="button" class="note-row" @click="$emit('open-note', n.id)">
               <div class="thumb" :class="{ empty: !coverOf(n) }">
-                <img v-if="coverOf(n)" :src="coverOf(n)" alt="" loading="lazy" />
+                <SignedImg v-if="coverOf(n)" :src="coverOf(n)" alt="" loading="lazy" />
                 <span v-else>{{ (n.title || '笔').slice(0, 1) }}</span>
               </div>
               <div class="info">

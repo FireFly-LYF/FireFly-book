@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { noteApi, socialApi, toLocalMediaUrl, userApi } from '../api'
 import UserAvatar from './UserAvatar.vue'
+import SignedImg from './SignedImg.vue'
 
 const props = defineProps({
   noteId: { type: [Number, String], default: null },
@@ -152,7 +153,7 @@ function goAuthor() {
   <div v-if="open" class="mask" @click.self="$emit('close')">
     <div class="panel">
       <div class="cover" :class="{ empty: !cover }">
-        <img v-if="cover" :src="cover" alt="" />
+        <SignedImg v-if="cover" :src="cover" alt="" />
         <div v-else class="cover-ph">{{ (detail?.title || '笔记').slice(0, 1) }}</div>
         <button type="button" class="close-float" @click="$emit('close')">×</button>
       </div>

@@ -83,7 +83,7 @@ func (g *Gateway) Register(r *gin.Engine) {
 	api.Use(middleware.TrafficStats(g.stats))
 	api.Any("/*path", proxyHandler)
 
-	// 媒体静态文件：/files/** → media-service（通常不强制租户 JWT）
+	// 媒体静态文件：/files/** → media-service（JWT 可选；真实访问控制靠签名 URL）
 	if g.router != nil {
 		if _, ok := g.router.Get("media-files"); ok {
 			files := r.Group("/files")

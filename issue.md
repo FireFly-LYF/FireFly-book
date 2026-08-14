@@ -17,8 +17,8 @@
 | S5 | **已修复** | 旧 `/gateway/login` 无真实凭证即可拿与业务同 secret 的 JWT | 现为运维口令登录；签发密钥为 `admin.jwt_secret` | 不能再「只填租户」拿业务级 Token | 口令/密钥外置见 **S3** |
 | S6 | **已修复** | 业务用户 JWT 可访问网关运维 API | `AdminJWTAuth(admin.jwt_secret)` + `typ=admin`；与 `jwt.secret` 强制不同 | 业务 Access 验签失败 → 401；运维须 `/gateway/login` + `admin.password` | 密钥外置（S3）；生产可再加 IP 限制 / mTLS |
 | S7 | **已修复** | CORS 反射任意 Origin | `cors.go` + `gateway.yaml` `cors.allowed_origins` | 仅白名单 Origin 可跨域；未命中不写 Allow-Origin，预检 403 | 生产把名单换成正式前端域名；空名单=最严 |
-| S8 | 未改 | `/files/**` 无强制鉴权 + 本地静态挂载 | `gateway.yaml` `media-files auth: false`；media `WebConfig`；Filter 对 `/files/**` 放行 | 猜到 UUID 即可读未公开图片 | 对象存储 + 签名 URL；或鉴权代理 |
-| S9 | 未改 | 媒体仅靠 `Content-Type` 前缀校验 | `MediaService.save` | 伪装 MIME 上传非图/恶意内容；扩展名污染 | 魔数校验、扩展名白名单、服务端重编码 |
+| S8 | **已修复** | `/files/**` 无强制鉴权 + 本地静态挂载 | `SignedFileFilter` + `POST /api/media/sign`；前端 `SignedImg` | 访问须带未过期 `exp`+`sig`；规范路径入库，展示时再签名 | 远期可迁对象存储预签名 |
+| S9 | **已修复** | 媒体仅靠 `Content-Type` 前缀校验 | `ImageProbe` + `MediaService.save` | 魔数识别 JPEG/PNG/GIF/WEBP；扩展名白名单；落盘名=UUID+检测扩展名 | 可选 ImageIO 二次解码/重编码 |
 
 ---
 
@@ -90,7 +90,7 @@
 
 ## 建议修复顺序
 
-1. **安全基线剩余**（S8、S9）：媒体鉴权与校验  
+1. **安全基线剩余**：无（S1–S9 主路径已收口；生产密钥改 Secret Manager）  
 2. **媒体与部署**（D1–D2）：对象存储、配置外置、完整编排  
 3. **MQ 可靠**（M1–M3）：重试 + DLQ + Outbox/对账  
 4. **Feed/HTTP 韧性**（R1–R4）：超时、熔断、批量接口、限流调参  
@@ -107,5 +107,7 @@
 | **S5** | `/gateway/login` 改为运维口令；不再签发业务密钥 JWT |
 | **S6** | 运维 API 使用独立 `admin.jwt_secret` + `typ=admin`，业务 Token 不可用 |
 | **S7** | CORS 改为 Origin 白名单 |
+| **S8** | `/files/**` 签名 URL（exp+sig）；无签名 403 |
+| **S9** | 上传魔数 + 扩展名白名单 + 服务端决定扩展名 |
 
 网关侧既有正向设计（清客户端 `X-User-Id` 再注入、路由级熔断、笔记 create/delete 的 afterCommit）继续保留。
