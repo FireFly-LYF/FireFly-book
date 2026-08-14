@@ -8,7 +8,9 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
+	"gateway/internal/auth"
 	"gateway/internal/lb"
 	"gateway/internal/registry"
 
@@ -24,30 +26,30 @@ const (
 )
 
 // Handler 返回 HTTP 反向代理 Gin 中间件（单一 LB 池，兼容旧配置）。
-func Handler(b lb.Balancer, cb *registry.CircuitBreaker) gin.HandlerFunc {
-	return HandlerWithOptions(b, cb, "")
+func Handler(b lb.Balancer, cb *registry.CircuitBreaker, hmacSecret []byte) gin.HandlerFunc {
+	return HandlerWithOptions(b, cb, "", hmacSecret)
 }
 
 // HandlerWithOptions 支持配置路径剥离前缀。
 // stripPrefix 非空时剥离（如 /api）；空则保留完整路径（FireFly Java Controller）。
-func HandlerWithOptions(b lb.Balancer, cb *registry.CircuitBreaker, stripPrefix string) gin.HandlerFunc {
+func HandlerWithOptions(b lb.Balancer, cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte) gin.HandlerFunc {
 	return newProxyHandler(func(c *gin.Context) (lb.Balancer, bool) {
 		return b, b != nil
-	}, cb, stripPrefix)
+	}, cb, stripPrefix, hmacSecret)
 }
 
 // RouteHandler 按路径前缀选择不同 LB 池。
-func RouteHandler(router *registry.HTTPRouter, cb *registry.CircuitBreaker, stripPrefix string) gin.HandlerFunc {
+func RouteHandler(router *registry.HTTPRouter, cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte) gin.HandlerFunc {
 	return newProxyHandler(func(c *gin.Context) (lb.Balancer, bool) {
 		route, ok := router.Match(c.Request.URL.Path)
 		if !ok {
 			return nil, false
 		}
 		return route.Balancers.HTTP, true
-	}, cb, stripPrefix)
+	}, cb, stripPrefix, hmacSecret)
 }
 
-func newProxyHandler(pickBalancer func(*gin.Context) (lb.Balancer, bool), cb *registry.CircuitBreaker, stripPrefix string) gin.HandlerFunc {
+func newProxyHandler(pickBalancer func(*gin.Context) (lb.Balancer, bool), cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte) gin.HandlerFunc {
 	var mu sync.Mutex
 	cache := map[string]*httputil.ReverseProxy{}
 
@@ -61,9 +63,10 @@ func newProxyHandler(pickBalancer func(*gin.Context) (lb.Balancer, bool), cb *re
 		if err != nil {
 			return nil, err
 		}
+		secret := append([]byte(nil), hmacSecret...)
 		p := &httputil.ReverseProxy{
 			Rewrite: func(pr *httputil.ProxyRequest) {
-				rewrite(pr, remote, stripPrefix)
+				rewrite(pr, remote, stripPrefix, secret)
 			},
 		}
 		cache[target] = p
@@ -134,7 +137,7 @@ func anyToString(v any) string {
 }
 
 // rewrite 在转发前修改出站请求的 URL 与 Header。
-func rewrite(pr *httputil.ProxyRequest, remote *url.URL, stripPrefix string) {
+func rewrite(pr *httputil.ProxyRequest, remote *url.URL, stripPrefix string, hmacSecret []byte) {
 	pr.SetURL(remote)
 
 	path := pr.In.URL.Path
@@ -153,10 +156,21 @@ func rewrite(pr *httputil.ProxyRequest, remote *url.URL, stripPrefix string) {
 		pr.Out.Header.Set("X-Tenant-Id", tenant)
 	}
 
-	// 防伪造：先清客户端 X-User-Id，再写入网关从 JWT 解析的 uid
+	// 防伪造：清客户端身份头，再由网关写入并 HMAC 签名
 	pr.Out.Header.Del("X-User-Id")
-	if userID, ok := pr.In.Context().Value(ctxUserID).(string); ok && userID != "" {
+	pr.Out.Header.Del("X-Gateway-Ts")
+	pr.Out.Header.Del("X-Gateway-Sign")
+
+	userID := ""
+	if uid, ok := pr.In.Context().Value(ctxUserID).(string); ok && uid != "" {
+		userID = uid
 		pr.Out.Header.Set("X-User-Id", userID)
+	}
+
+	if len(hmacSecret) > 0 {
+		ts := time.Now().Unix()
+		pr.Out.Header.Set("X-Gateway-Ts", auth.FormatTs(ts))
+		pr.Out.Header.Set("X-Gateway-Sign", auth.SignInternal(hmacSecret, userID, ts))
 	}
 
 	if clientIP, ok := pr.In.Context().Value(ctxClientIP).(string); ok && clientIP != "" {

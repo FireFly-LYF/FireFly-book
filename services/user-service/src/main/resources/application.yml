@@ -1,4 +1,6 @@
-server:
+﻿server:
+  # 仅本机可达，防旁路伪造 X-User-Id；对外只走 Gateway :8080
+  address: 127.0.0.1
   port: 9001
 
 spring:
@@ -18,8 +20,12 @@ mybatis:
     map-underscore-to-camel-case: true   # user_name ? userName
   type-aliases-package: userservice.entity
 
-# 与 Gateway jwt.secret 一致；Access 由网关验签后注入 X-User-Id
+# Access JWT 与 Gateway jwt.secret 一致；下游身份靠 internal-auth HMAC
 firefly:
+  internal-auth:
+    enabled: true
+    hmac-secret: firefly-internal-hmac-dev-change-me!
+    skew-sec: 60
   jwt:
     secret: phase3-dev-secret-change-me-32bytes!
     access-ttl: 30m

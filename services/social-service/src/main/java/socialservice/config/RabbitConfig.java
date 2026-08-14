@@ -1,5 +1,6 @@
 package socialservice.config;
 
+import com.firefly.internalauth.GatewayHmacClientInterceptor;
 import socialservice.mq.MqConstants;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
@@ -12,6 +13,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
+
 @Configuration
 public class RabbitConfig {
 
@@ -21,8 +24,10 @@ public class RabbitConfig {
     }
 
     @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
+    public RestTemplate restTemplate(GatewayHmacClientInterceptor hmacInterceptor) {
+        RestTemplate rt = new RestTemplate();
+        rt.setInterceptors(List.of(hmacInterceptor));
+        return rt;
     }
 
     @Bean

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.firefly</groupId>
+	<artifactId>firefly-services</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>firefly-services</name>
+	<description>聚合模块：便于 IDE 解析 firefly-internal-auth 等兄弟依赖</description>
+	<modules>
+		<module>firefly-internal-auth</module>
+		<module>user-service</module>
+		<module>content-service</module>
+		<module>media-service</module>
+		<module>social-service</module>
+		<module>notify-service</module>
+		<module>feed-service</module>
+		<module>search-service</module>
+	</modules>
+</project>

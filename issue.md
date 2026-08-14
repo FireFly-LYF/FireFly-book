@@ -9,7 +9,7 @@
 
 | ID | 风险 | 证据位置 | 上线后果 | 建议方向 |
 |----|------|----------|----------|----------|
-| S1 | Java 服务只信 `X-User-Id`，自身不验 JWT | 各服务 Controller；网关 `proxy/http.go` 清头再注入 | 9001–9007 若旁路可达，伪造头即可冒充任意用户 | 服务仅内网监听；或服务侧再验 JWT / mTLS |
+| S1 | Java 服务只信 `X-User-Id`，自身不验 JWT | 各服务 Controller；网关 `proxy/http.go` 清头再注入 | ~~公网旁路~~：**已绑 `127.0.0.1`** + **网关 HMAC(`X-Gateway-Ts/Sign`)**；同机无密钥仍难伪造 | 密钥外置；时钟同步；可选再加强 mTLS |
 | S2 | ~~`/api/*/inner/**` 经网关对登录用户开放~~ **已缓解** | 网关 `BlockList`：显式 `/api/search/inner`、`/api/notify/inner` + 通配 `/api/<svc>/inner/**` | 经网关调用返回 403；**旁路直连下游仍可打**（见 S1） | 保持黑名单；下游仍应内网隔离 / 服务账号 |
 | S3 | JWT / DB / MQ 密钥口令硬编码进仓库 | 各 `application.yml`、`Gateway/.../gateway.yaml` | 泄露即可伪造 Token、接管库与 MQ | 环境变量 / Secret Manager；禁止默认值进生产镜像 |
 | S4 | 密码 MD5 无盐 | `UserService.java`（注释已写应用 BCrypt） | 库泄露后易彩虹表/撞库 | BCrypt/Argon2 + 存量迁移 |

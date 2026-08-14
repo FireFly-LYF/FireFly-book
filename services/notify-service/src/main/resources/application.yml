@@ -1,4 +1,6 @@
 server:
+  # 仅本机可达，防旁路伪造 X-User-Id；对外只走 Gateway :8080
+  address: 127.0.0.1
   port: 9005
 
 spring:
@@ -19,3 +21,9 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
   type-aliases-package: notifyservice.entity
+
+firefly:
+  internal-auth:
+    enabled: true
+    hmac-secret: firefly-internal-hmac-dev-change-me!
+    skew-sec: 60

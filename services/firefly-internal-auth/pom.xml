@@ -9,35 +9,26 @@
 		<relativePath/>
 	</parent>
 	<groupId>com.firefly</groupId>
-	<artifactId>feed-service</artifactId>
+	<artifactId>firefly-internal-auth</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>feed-service</name>
-	<description>关注流（读扩散 pull）</description>
+	<name>firefly-internal-auth</name>
+	<description>Gateway HMAC internal auth shared by FireFly Java services</description>
 	<properties>
 		<java.version>17</java.version>
 	</properties>
 	<dependencies>
-		<dependency>
-			<groupId>com.firefly</groupId>
-			<artifactId>firefly-internal-auth</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
-		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webmvc-test</artifactId>
-			<scope>test</scope>
+			<artifactId>spring-boot-autoconfigure</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
 		</dependency>
 	</dependencies>
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
 </project>

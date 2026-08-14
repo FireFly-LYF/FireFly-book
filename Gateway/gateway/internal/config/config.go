@@ -22,6 +22,7 @@ type Config struct {
 	Security       SecurityConfig       `yaml:"security"`
 	CORS           CORSConfig           `yaml:"cors"`
 	JWT            JWTConfig            `yaml:"jwt"`
+	InternalAuth   InternalAuthConfig   `yaml:"internal_auth"`
 	Tenants        []string             `yaml:"tenants"`
 	Redis          RedisConfig          `yaml:"redis"`
 	RateLimit      RateLimitConfig      `yaml:"ratelimit"`
@@ -31,11 +32,12 @@ type Config struct {
 	Proxy          ProxyConfig          `yaml:"proxy"`
 	Routes         []RouteConfig        `yaml:"routes"`
 
-	jwtSecret    []byte        // JWT.Secret 的字节形式，供签发/验签使用
-	tokenTTL     time.Duration // JWT.TokenTTL 解析后的时长，如 "24h"
-	lbCfg        lb.Config     // HTTP 整理后的 LB 配置（节点 URL + 权重）
-	balancer     lb.Balancer   // HTTP 负载均衡器，proxy 直接调用
-	grpcBalancer lb.Balancer   // gRPC 负载均衡器，grpc director 调用
+	jwtSecret      []byte        // JWT.Secret 的字节形式，供签发/验签使用
+	internalHMAC   []byte        // 下游身份头 HMAC 密钥
+	tokenTTL       time.Duration // JWT.TokenTTL 解析后的时长，如 "24h"
+	lbCfg          lb.Config     // HTTP 整理后的 LB 配置（节点 URL + 权重）
+	balancer       lb.Balancer   // HTTP 负载均衡器，proxy 直接调用
+	grpcBalancer   lb.Balancer   // gRPC 负载均衡器，grpc director 调用
 }
 
 // ProxyConfig 控制反向代理路径改写。
@@ -70,6 +72,11 @@ type JWTConfig struct {
 	Secret      string `yaml:"secret"`       // HS256 签名密钥
 	TokenTTL    string `yaml:"token_ttl"`    // Token 有效期，Go duration 格式，如 24h、30m
 	APIRequired *bool  `yaml:"api_required"` // /api 是否强制 JWT；nil/true=强制，false=开发联调可跳过
+}
+
+// InternalAuthConfig 网关 → Java 下游的轻量身份证明（HMAC，非用户 JWT）。
+type InternalAuthConfig struct {
+	HMACSecret string `yaml:"hmac_secret"` // 与各服务 firefly.internal-auth.hmac-secret 一致
 }
 
 type LBConfig struct {
@@ -146,6 +153,7 @@ func (c *Config) initRuntime() error {
 	}
 	c.tokenTTL = ttl
 	c.jwtSecret = []byte(c.JWT.Secret)
+	c.internalHMAC = []byte(c.InternalAuth.HMACSecret)
 
 	lbCfg, err := c.BalancerConfig()
 	if err != nil {
@@ -193,6 +201,9 @@ func defaultConfig() *Config {
 			Secret:   "phase3-dev-secret-change-me",
 			TokenTTL: "24h",
 		},
+		InternalAuth: InternalAuthConfig{
+			HMACSecret: "firefly-internal-hmac-dev-change-me!",
+		},
 		Tenants: []string{"tenant-a", "tenant-b"},
 		CORS: CORSConfig{
 			AllowedOrigins: []string{
@@ -230,6 +241,9 @@ func (c *Config) validate() error {
 	}
 	if c.JWT.Secret == "" {
 		return fmt.Errorf("jwt.secret must not be empty")
+	}
+	if c.InternalAuth.HMACSecret == "" {
+		return fmt.Errorf("internal_auth.hmac_secret must not be empty")
 	}
 	if _, err := c.parseTokenTTL(); err != nil {
 		return fmt.Errorf("jwt.token_ttl: %w", err)
@@ -306,6 +320,11 @@ func (c *Config) validate() error {
 
 func (c *Config) JWTSecret() []byte {
 	return c.jwtSecret
+}
+
+// InternalHMACSecret 网关注入 X-Gateway-Sign 所用密钥。
+func (c *Config) InternalHMACSecret() []byte {
+	return c.internalHMAC
 }
 
 // APIAuthRequired /api 业务链是否强制 JWT；未配置时默认 true（兼容旧行为）。

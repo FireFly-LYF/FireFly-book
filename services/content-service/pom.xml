@@ -31,10 +31,15 @@
 	</properties>
 	<dependencies>
 		<dependency>
+			<groupId>com.firefly</groupId>
+			<artifactId>firefly-internal-auth</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
-		<!-- 发笔记后异步通知 search 写 ES -->
+		<!-- 鍙戠瑪璁板悗寮傛閫氱煡 search 鍐?ES -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-amqp</artifactId>

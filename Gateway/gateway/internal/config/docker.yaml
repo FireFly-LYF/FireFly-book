@@ -12,6 +12,9 @@ jwt:
   secret: "phase3-dev-secret-change-me-32bytes!"
   token_ttl: "30m"
 
+internal_auth:
+  hmac_secret: "firefly-internal-hmac-dev-change-me!"
+
 tenants:
   - tenant-a
   - tenant-b

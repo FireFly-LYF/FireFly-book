@@ -1,4 +1,6 @@
 server:
+  # 仅本机可达，防旁路伪造 X-User-Id；对外只走 Gateway :8080
+  address: 127.0.0.1
   port: 9003
 
 spring:
@@ -20,3 +22,9 @@ mybatis:
 media:
   storage-dir: D:/FireFlyData/media
   public-base-url: http://127.0.0.1:9003/files
+
+firefly:
+  internal-auth:
+    enabled: true
+    hmac-secret: firefly-internal-hmac-dev-change-me!
+    skew-sec: 60

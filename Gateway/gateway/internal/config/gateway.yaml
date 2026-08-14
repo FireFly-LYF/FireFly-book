@@ -17,6 +17,10 @@ jwt:
   # 业务 /api 强制 JWT；register|login|refresh 白名单放行
   api_required: true
 
+# 下游身份头：HMAC(userId|ts)，与各 Java firefly.internal-auth.hmac-secret 一致（勿与 jwt.secret 复用）
+internal_auth:
+  hmac_secret: "firefly-internal-hmac-dev-change-me!"
+
 tenants:
   - tenant-a
   - tenant-b

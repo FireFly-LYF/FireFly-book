@@ -12,16 +12,21 @@
 	<artifactId>search-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>search-service</name>
-	<description>Elasticsearch 搜索（笔记/用户）；MQ 异步索引</description>
+	<description>Elasticsearch 鎼滅储锛堢瑪璁?鐢ㄦ埛锛夛紱MQ 寮傛绱㈠紩</description>
 	<properties>
 		<java.version>17</java.version>
 	</properties>
 	<dependencies>
 		<dependency>
+			<groupId>com.firefly</groupId>
+			<artifactId>firefly-internal-auth</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
-		<!-- 消费 note.created / user.upserted 等事件 -->
+		<!-- 娑堣垂 note.created / user.upserted 绛変簨浠?-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-amqp</artifactId>
