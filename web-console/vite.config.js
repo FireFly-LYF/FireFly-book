@@ -4,6 +4,7 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   server: {
+    host: '0.0.0.0',
     port: 5173,
     proxy: {
       // 统一经 Gateway :8080 按路径转发到各 Java 服务

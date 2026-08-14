@@ -7,25 +7,28 @@ import { login, saveAuth } from '../api/gateway'
 const router = useRouter()
 const route = useRoute()
 
-// 表单：租户名（后端白名单如 tenant-a / tenant-b）
 const tenant = ref('tenant-a')
+const password = ref('')
 const loading = ref(false)
 
-/** 提交登录：调用 POST /gateway/login，JWT 写入 localStorage */
+/** 提交登录：POST /gateway/login（运维口令），JWT 写入 localStorage */
 async function handleLogin() {
   const name = tenant.value.trim()
   if (!name) {
     ElMessage.warning('请输入租户名')
     return
   }
+  if (!password.value) {
+    ElMessage.warning('请输入运维口令')
+    return
+  }
 
   loading.value = true
   try {
-    const { token } = await login(name)
+    const { token } = await login(name, password.value)
     saveAuth(token, name)
     ElMessage.success('登录成功')
 
-    // 支持从守卫带来的 redirect 参数，登录后跳回原页面
     const redirect = (route.query.redirect as string) || '/services'
     await router.push(redirect)
   } catch (err) {
@@ -46,10 +49,19 @@ async function handleLogin() {
       <el-form label-width="80px" @submit.prevent="handleLogin">
         <el-form-item label="租户">
           <el-select v-model="tenant" placeholder="选择租户" style="width: 100%">
-            <!-- 与后端 internal/tenant 白名单一致 -->
             <el-option label="tenant-a" value="tenant-a" />
             <el-option label="tenant-b" value="tenant-b" />
           </el-select>
+        </el-form-item>
+
+        <el-form-item label="口令">
+          <el-input
+            v-model="password"
+            type="password"
+            show-password
+            placeholder="admin.password"
+            autocomplete="current-password"
+          />
         </el-form-item>
 
         <el-form-item>
@@ -59,7 +71,7 @@ async function handleLogin() {
         </el-form-item>
       </el-form>
 
-      <p class="hint">登录后 Token 存入 localStorage，后续请求自动携带 Authorization 头。</p>
+      <p class="hint">使用 gateway.yaml 中 admin.password；业务用户 Token 无法访问运维 API。</p>
     </el-card>
   </div>
 </template>

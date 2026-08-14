@@ -133,9 +133,9 @@ function unwrap<T>(response: { data: ApiResponse<T> }): T {
 // /gateway/* 管理 API 封装
 // ---------------------------------------------------------------------------
 
-/** POST /gateway/login — 租户登录，签发 JWT */
-export async function login(tenant: string): Promise<LoginData> {
-  const res = await http.post<ApiResponse<LoginData>>('/login', { tenant })
+/** POST /gateway/login — 运维口令登录，签发 typ=admin JWT（非业务 Access） */
+export async function login(tenant: string, password: string): Promise<LoginData> {
+  const res = await http.post<ApiResponse<LoginData>>('/login', { tenant, password })
   return unwrap(res)
 }
 

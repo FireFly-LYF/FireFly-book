@@ -1,23 +1,31 @@
 package handler
 
 import (
+	"crypto/subtle"
+
 	"gateway/internal/auth"
 	"gateway/internal/tenant"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Login 曾用于 POST /gateway/login（仅校验租户名即签发 JWT）。
-// 路由已在 Register 中禁用，保留函数供测试/文档对照，勿重新挂载到生产。
-func (g *Gateway) Login(c *gin.Context) {
+// AdminLogin POST /gateway/login：校验运维口令后签发 typ=admin 的 Token（admin.jwt_secret）。
+// 业务 Access Token 使用另一套密钥，无法调用 /gateway/* 运维接口。
+func (g *Gateway) AdminLogin(c *gin.Context) {
 	var req struct {
-		Tenant string `json:"tenant"`
+		Tenant   string `json:"tenant"`
+		Password string `json:"password"`
 	}
 	if err := c.BindJSON(&req); err != nil || !tenant.IsValid(req.Tenant) {
 		c.JSON(400, gin.H{"code": 400, "msg": "bad tenant"})
 		return
 	}
-	token, err := auth.Sign(req.Tenant, g.cfg.TokenTTLDuration(), g.cfg.JWTSecret())
+	want := g.cfg.AdminPassword()
+	if subtle.ConstantTimeCompare([]byte(req.Password), []byte(want)) != 1 {
+		c.JSON(401, gin.H{"code": 401, "msg": "invalid admin credentials"})
+		return
+	}
+	token, err := auth.SignAdmin(req.Tenant, g.cfg.AdminTokenTTLDuration(), g.cfg.AdminJWTSecret())
 	if err != nil {
 		c.JSON(500, gin.H{"code": 500, "msg": "sign failed"})
 		return

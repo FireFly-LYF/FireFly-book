@@ -36,12 +36,12 @@ func (g *Gateway) Register(r *gin.Engine) {
 	r.Use(middleware.RequestLogger())
 	r.Use(middleware.IPBlockList(middleware.IPsToSet(g.cfg.Security.IPBlocklist)))
 
-	// /gateway/login 已禁用：无真实凭证签发与业务同 secret 的 JWT，生产不可用。
-	// 业务鉴权走 /api/user/login；运维请用独立通道，勿复用业务 Token。
+	// 运维登录：独立口令 + admin.jwt_secret；业务 Access 不可用此处 Token 调业务 API，也不可反向调运维 API
+	r.POST("/gateway/login", g.AdminLogin)
 	r.GET("/gateway/health", g.Health)
 
 	admin := r.Group("/gateway")
-	admin.Use(middleware.JWTAuth(g.cfg.JWTSecret()))
+	admin.Use(middleware.AdminJWTAuth(g.cfg.AdminJWTSecret()))
 	admin.GET("/services", g.ListServices)
 	admin.POST("/services", g.RegisterService)
 	admin.DELETE("/services", g.DeregisterService)

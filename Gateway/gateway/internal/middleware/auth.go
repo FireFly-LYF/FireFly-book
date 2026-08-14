@@ -9,20 +9,25 @@ import (
 )
 
 func JWTAuth(secret []byte) gin.HandlerFunc {
-	return jwtAuth(secret, true, nil)
+	return jwtAuth(secret, true, nil, "")
+}
+
+// AdminJWTAuth 运维通道：必须用 admin 密钥验签，且 typ=admin。
+func AdminJWTAuth(secret []byte) gin.HandlerFunc {
+	return jwtAuth(secret, true, nil, auth.TypAdmin)
 }
 
 // OptionalJWTAuth 开发联调：无 Token 放行；有 Token 则校验。
 func OptionalJWTAuth(secret []byte) gin.HandlerFunc {
-	return jwtAuth(secret, false, nil)
+	return jwtAuth(secret, false, nil, "")
 }
 
 // JWTAuthExcept 强制 JWT，但 skip 中的「METHOD path」放行（如 POST /api/user/login）。
 func JWTAuthExcept(secret []byte, skip map[string]struct{}) gin.HandlerFunc {
-	return jwtAuth(secret, true, skip)
+	return jwtAuth(secret, true, skip, "")
 }
 
-func jwtAuth(secret []byte, required bool, skip map[string]struct{}) gin.HandlerFunc {
+func jwtAuth(secret []byte, required bool, skip map[string]struct{}, requireTyp string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if skip != nil {
 			key := c.Request.Method + " " + c.Request.URL.Path
@@ -53,8 +58,14 @@ func jwtAuth(secret []byte, required bool, skip map[string]struct{}) gin.Handler
 			c.Abort()
 			return
 		}
-		// 仅允许 Access；无 typ 的旧 Token 暂兼容；显式非 access（如误传 refresh JWT）拒绝
-		if claims.TokenType != "" && claims.TokenType != "access" {
+		if requireTyp != "" {
+			if claims.TokenType != requireTyp {
+				c.JSON(401, gin.H{"code": 401, "msg": requireTyp + " token required"})
+				c.Abort()
+				return
+			}
+		} else if claims.TokenType != "" && claims.TokenType != auth.TypAccess {
+			// 业务链：仅允许 Access；无 typ 的旧 Token 暂兼容；拒绝 admin/refresh 等
 			c.JSON(401, gin.H{"code": 401, "msg": "access token required"})
 			c.Abort()
 			return

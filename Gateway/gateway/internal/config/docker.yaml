@@ -12,6 +12,11 @@ jwt:
   secret: "phase3-dev-secret-change-me-32bytes!"
   token_ttl: "30m"
 
+admin:
+  jwt_secret: "firefly-admin-jwt-dev-change-me!"
+  password: "admin-dev-change-me"
+  token_ttl: "8h"
+
 internal_auth:
   hmac_secret: "firefly-internal-hmac-dev-change-me!"
 

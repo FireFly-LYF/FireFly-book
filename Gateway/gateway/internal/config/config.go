@@ -22,6 +22,7 @@ type Config struct {
 	Security       SecurityConfig       `yaml:"security"`
 	CORS           CORSConfig           `yaml:"cors"`
 	JWT            JWTConfig            `yaml:"jwt"`
+	Admin          AdminConfig          `yaml:"admin"`
 	InternalAuth   InternalAuthConfig   `yaml:"internal_auth"`
 	Tenants        []string             `yaml:"tenants"`
 	Redis          RedisConfig          `yaml:"redis"`
@@ -32,9 +33,11 @@ type Config struct {
 	Proxy          ProxyConfig          `yaml:"proxy"`
 	Routes         []RouteConfig        `yaml:"routes"`
 
-	jwtSecret      []byte        // JWT.Secret 的字节形式，供签发/验签使用
+	jwtSecret      []byte        // 业务 Access JWT 密钥
+	adminJWTSecret []byte        // 运维 /gateway/* JWT 密钥（必须与业务不同）
 	internalHMAC   []byte        // 下游身份头 HMAC 密钥
 	tokenTTL       time.Duration // JWT.TokenTTL 解析后的时长，如 "24h"
+	adminTokenTTL  time.Duration // Admin.TokenTTL
 	lbCfg          lb.Config     // HTTP 整理后的 LB 配置（节点 URL + 权重）
 	balancer       lb.Balancer   // HTTP 负载均衡器，proxy 直接调用
 	grpcBalancer   lb.Balancer   // gRPC 负载均衡器，grpc director 调用
@@ -72,6 +75,13 @@ type JWTConfig struct {
 	Secret      string `yaml:"secret"`       // HS256 签名密钥
 	TokenTTL    string `yaml:"token_ttl"`    // Token 有效期，Go duration 格式，如 24h、30m
 	APIRequired *bool  `yaml:"api_required"` // /api 是否强制 JWT；nil/true=强制，false=开发联调可跳过
+}
+
+// AdminConfig 网关运维通道：与业务 JWT 完全隔离。
+type AdminConfig struct {
+	JWTSecret string `yaml:"jwt_secret"` // 仅签发/校验 /gateway/* Token
+	Password  string `yaml:"password"`   // POST /gateway/login 口令
+	TokenTTL  string `yaml:"token_ttl"`  // 运维 Token 有效期；空则 8h
 }
 
 // InternalAuthConfig 网关 → Java 下游的轻量身份证明（HMAC，非用户 JWT）。
@@ -154,6 +164,12 @@ func (c *Config) initRuntime() error {
 	c.tokenTTL = ttl
 	c.jwtSecret = []byte(c.JWT.Secret)
 	c.internalHMAC = []byte(c.InternalAuth.HMACSecret)
+	c.adminJWTSecret = []byte(c.Admin.JWTSecret)
+	adminTTL, err := c.parseAdminTokenTTL()
+	if err != nil {
+		return fmt.Errorf("admin.token_ttl: %w", err)
+	}
+	c.adminTokenTTL = adminTTL
 
 	lbCfg, err := c.BalancerConfig()
 	if err != nil {
@@ -201,6 +217,11 @@ func defaultConfig() *Config {
 			Secret:   "phase3-dev-secret-change-me",
 			TokenTTL: "24h",
 		},
+		Admin: AdminConfig{
+			JWTSecret: "firefly-admin-jwt-dev-change-me!",
+			Password:  "admin-dev-change-me",
+			TokenTTL:  "8h",
+		},
 		InternalAuth: InternalAuthConfig{
 			HMACSecret: "firefly-internal-hmac-dev-change-me!",
 		},
@@ -245,8 +266,20 @@ func (c *Config) validate() error {
 	if c.InternalAuth.HMACSecret == "" {
 		return fmt.Errorf("internal_auth.hmac_secret must not be empty")
 	}
+	if c.Admin.JWTSecret == "" {
+		return fmt.Errorf("admin.jwt_secret must not be empty")
+	}
+	if c.Admin.Password == "" {
+		return fmt.Errorf("admin.password must not be empty")
+	}
+	if c.Admin.JWTSecret == c.JWT.Secret {
+		return fmt.Errorf("admin.jwt_secret must differ from jwt.secret")
+	}
 	if _, err := c.parseTokenTTL(); err != nil {
 		return fmt.Errorf("jwt.token_ttl: %w", err)
+	}
+	if _, err := c.parseAdminTokenTTL(); err != nil {
+		return fmt.Errorf("admin.token_ttl: %w", err)
 	}
 	if len(c.Tenants) == 0 {
 		return fmt.Errorf("tenants must not be empty")
@@ -320,6 +353,28 @@ func (c *Config) validate() error {
 
 func (c *Config) JWTSecret() []byte {
 	return c.jwtSecret
+}
+
+// AdminJWTSecret 运维 /gateway/* 专用密钥；业务 Access 无法通过此密钥验签。
+func (c *Config) AdminJWTSecret() []byte {
+	return c.adminJWTSecret
+}
+
+// AdminPassword 运维登录口令。
+func (c *Config) AdminPassword() string {
+	return c.Admin.Password
+}
+
+// AdminTokenTTLDuration 运维 Token TTL。
+func (c *Config) AdminTokenTTLDuration() time.Duration {
+	return c.adminTokenTTL
+}
+
+func (c *Config) parseAdminTokenTTL() (time.Duration, error) {
+	if c.Admin.TokenTTL == "" {
+		return 8 * time.Hour, nil
+	}
+	return time.ParseDuration(c.Admin.TokenTTL)
 }
 
 // InternalHMACSecret 网关注入 X-Gateway-Sign 所用密钥。
