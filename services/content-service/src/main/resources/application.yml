@@ -26,3 +26,7 @@ firefly:
     enabled: true
     hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
+  outbox:
+    poll-interval-ms: 2000
+    batch-size: 50
+    max-attempts: 20

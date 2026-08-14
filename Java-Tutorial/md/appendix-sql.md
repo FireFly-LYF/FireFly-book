@@ -67,6 +67,22 @@ CREATE TABLE IF NOT EXISTS `note_media` (
   KEY idx_note (`note_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 笔记领域事件发件箱：与 note 同事务写入，后台投递到 Rabbit（M3 Outbox）
+CREATE TABLE IF NOT EXISTS `outbox_event` (
+  `id`             BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `aggregate_type` VARCHAR(32)  NOT NULL COMMENT 'note',
+  `aggregate_id`   BIGINT       NOT NULL,
+  `event_type`     VARCHAR(64)  NOT NULL COMMENT 'routing key: note.created/...',
+  `payload`        JSON         NOT NULL,
+  `status`         VARCHAR(16)  NOT NULL DEFAULT 'NEW' COMMENT 'NEW|SENT|DEAD',
+  `attempts`       INT          NOT NULL DEFAULT 0,
+  `next_retry_at`  DATETIME     DEFAULT NULL,
+  `last_error`     VARCHAR(512) DEFAULT NULL,
+  `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_outbox_poll (`status`, `next_retry_at`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ========== media ==========
 CREATE DATABASE IF NOT EXISTS media DEFAULT CHARACTER SET utf8mb4;
 USE media;

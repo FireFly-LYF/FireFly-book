@@ -6,8 +6,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * 发笔记领域事件给 search（以及以后的 feed/审核等消费者）。
- * 发送失败只打日志，不回滚主业务（最终一致；可另做补偿/对账）。
+ * 实际向 Rabbit 发送笔记事件。
+ * 失败必须抛出，由 OutboxRelay 记录重试；禁止再吞异常。
  */
 @Component
 public class NoteEventPublisher {
@@ -21,11 +21,7 @@ public class NoteEventPublisher {
     }
 
     public void publish(String routingKey, NoteIndexEvent event) {
-        try {
-            rabbitTemplate.convertAndSend(MqConstants.EXCHANGE_CONTENT, routingKey, event);
-        } catch (Exception e) {
-            log.warn("发送笔记事件失败 routingKey={} noteId={}: {}",
-                    routingKey, event.getId(), e.getMessage());
-        }
+        rabbitTemplate.convertAndSend(MqConstants.EXCHANGE_CONTENT, routingKey, event);
+        log.debug("已发送笔记事件 routingKey={} noteId={}", routingKey, event.getId());
     }
 }

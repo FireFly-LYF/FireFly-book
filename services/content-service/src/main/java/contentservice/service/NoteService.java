@@ -8,8 +8,9 @@ import contentservice.entity.NoteMedia;
 import contentservice.mapper.NoteMapper;
 import contentservice.mapper.NoteMediaMapper;
 import contentservice.mq.MqConstants;
-import contentservice.mq.NoteEventPublisher;
 import contentservice.mq.NoteIndexEvent;
+import contentservice.mq.OutboxRelay;
+import contentservice.mq.OutboxService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -22,17 +23,23 @@ public class NoteService {
 
     private final NoteMapper noteMapper;
     private final NoteMediaMapper noteMediaMapper;
-    private final NoteEventPublisher noteEventPublisher;
+    private final OutboxService outboxService;
+    private final OutboxRelay outboxRelay;
 
-    public NoteService(NoteMapper noteMapper, NoteMediaMapper noteMediaMapper, NoteEventPublisher noteEventPublisher) {
+    public NoteService(
+            NoteMapper noteMapper,
+            NoteMediaMapper noteMediaMapper,
+            OutboxService outboxService,
+            OutboxRelay outboxRelay) {
         this.noteMapper = noteMapper;
         this.noteMediaMapper = noteMediaMapper;
-        this.noteEventPublisher = noteEventPublisher;
+        this.outboxService = outboxService;
+        this.outboxRelay = outboxRelay;
     }
 
     /**
-     * 发笔记：事务内写 note + note_media；提交后再发 MQ，由 search 异步写 ES。
-     * 不在这里 HTTP 调 search，避免拖慢发笔记、也避免 search 挂掉导致发帖失败。
+     * 发笔记：事务内写 note + note_media + outbox；
+     * 提交后再触发一次投递（失败由定时 OutboxRelay 继续重试）。
      */
     @Transactional
     public NoteDetailResponse create(Long userId, CreateNoteRequest req) {
@@ -41,7 +48,7 @@ public class NoteService {
         n.setTitle(req.getTitle());
         n.setContent(req.getContent());
         n.setCoverUrl(req.getCoverUrl());
-        n.setStatus(1); // 已发布
+        n.setStatus(1);
         noteMapper.insert(n);
 
         List<String> urls = req.getMediaUrls();
@@ -55,9 +62,9 @@ public class NoteService {
             }
         }
 
-        // 必须等事务提交后再发消息，否则消费者可能读到「库里还没有」的旧状态
-        publishAfterCommit(
+        enqueueAndKick(
                 MqConstants.RK_NOTE_CREATED,
+                n.getId(),
                 NoteIndexEvent.from(n.getId(), n.getUserId(), n.getTitle(), n.getContent(), n.getCoverUrl()));
 
         return toDetail(n.getId());
@@ -67,7 +74,6 @@ public class NoteService {
         return noteMapper.findById(id);
     }
 
-    /** 详情：笔记 + 图片 URL 列表 */
     public NoteDetailResponse findDetail(Long id) {
         Note n = noteMapper.findById(id);
         if (n == null) {
@@ -87,6 +93,7 @@ public class NoteService {
         return noteMapper.listByUser(userId, size, offset);
     }
 
+    @Transactional
     public Note update(Long userId, Long noteId, UpdateNoteRequest req) {
         Note n = requireOwned(userId, noteId);
         if (req.getTitle() != null) {
@@ -101,9 +108,9 @@ public class NoteService {
         noteMapper.update(n);
         Note updated = noteMapper.findById(noteId);
 
-        // 更新后覆盖写 ES，保证搜到的是最新标题/正文
-        noteEventPublisher.publish(
+        enqueueAndKick(
                 MqConstants.RK_NOTE_UPDATED,
+                updated.getId(),
                 NoteIndexEvent.from(
                         updated.getId(), updated.getUserId(),
                         updated.getTitle(), updated.getContent(), updated.getCoverUrl()));
@@ -117,23 +124,23 @@ public class NoteService {
         noteMediaMapper.deleteByNoteId(noteId);
         noteMapper.delete(noteId);
 
-        // 删库提交后再删 ES，避免「库没有了还能搜到」
-        publishAfterCommit(MqConstants.RK_NOTE_DELETED, NoteIndexEvent.deleted(noteId));
+        enqueueAndKick(MqConstants.RK_NOTE_DELETED, noteId, NoteIndexEvent.deleted(noteId));
     }
 
     /**
-     * 有事务则 afterCommit 再发；无事务（如 update 未标 @Transactional）则立刻发。
+     * 事务内写 outbox；提交成功后再 kick Relay（此时行已可见）。
      */
-    private void publishAfterCommit(String routingKey, NoteIndexEvent event) {
+    private void enqueueAndKick(String routingKey, Long noteId, NoteIndexEvent event) {
+        outboxService.enqueueNoteEvent(routingKey, noteId, event);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    noteEventPublisher.publish(routingKey, event);
+                    outboxRelay.relayBatch();
                 }
             });
         } else {
-            noteEventPublisher.publish(routingKey, event);
+            outboxRelay.relayBatch();
         }
     }
 
