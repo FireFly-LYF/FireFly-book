@@ -1,0 +1,10 @@
+server:
+  address: ${SERVER_ADDRESS:0.0.0.0}
+
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+
+firefly:
+  elasticsearch:
+    base-url: ${ES_BASE_URL:http://elasticsearch:9200}

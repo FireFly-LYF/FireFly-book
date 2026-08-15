@@ -1,25 +1,24 @@
 ﻿server:
-  # 仅本机可达，防旁路伪造 X-User-Id；对外只走 Gateway :8080
-  address: 127.0.0.1
-  port: 9004
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:9004}
 
 spring:
   application:
     name: social-service
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/social?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: root
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/social?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
   rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: guest
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD}
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
 
 firefly:
   internal-auth:
@@ -27,7 +26,7 @@ firefly:
     hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
   content:
-    base-url: http://127.0.0.1:9002
+    base-url: ${CONTENT_BASE_URL:http://127.0.0.1:9002}
 
 mybatis:
   configuration:

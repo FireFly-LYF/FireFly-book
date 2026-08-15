@@ -5,8 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "media")
 public class MediaProperties {
 
-    /** 本地存储目录，如 D:/FireFlyData/media */
-    private String storageDir = "D:/FireFlyData/media";
+    /** 本地/卷挂载目录；优先 MEDIA_STORAGE_DIR，否则见 application.yml */
+    private String storageDir = System.getProperty("user.home") + "/FireFlyData/media";
 
     /**
      * 对外访问前缀。推荐经网关：http://127.0.0.1:8080/files

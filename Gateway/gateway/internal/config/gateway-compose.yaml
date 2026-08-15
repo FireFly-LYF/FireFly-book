@@ -1,0 +1,104 @@
+# Gateway 全栈 compose 配置：上游为 Java 业务服务名（非演示 downstream）
+# 由 deploy/docker-compose.yml 挂载并启动
+
+server:
+  addr: ":8080"
+
+grpc:
+  listen: ""
+  auth_required: true
+
+tcp:
+  listen: ""
+
+jwt:
+  secret: "${JWT_SECRET}"
+  token_ttl: "30m"
+  api_required: true
+
+admin:
+  jwt_secret: "${ADMIN_JWT_SECRET}"
+  password: "${ADMIN_PASSWORD}"
+  token_ttl: "8h"
+
+internal_auth:
+  hmac_secret: "${INTERNAL_HMAC_SECRET}"
+
+tenants:
+  - tenant-a
+  - tenant-b
+
+redis:
+  addr: "redis:6379"
+
+ratelimit:
+  rate: 100000
+  capacity: 100000
+  daily_limit: 100000000
+
+circuit_breaker:
+  threshold: 5
+  cooldown_sec: 30
+
+registry:
+  type: memory
+  dsn: "root:${MYSQL_PASSWORD}@tcp(mysql:3306)/gateway?parseTime=true"
+
+proxy:
+  strip_prefix: ""
+
+routes:
+  - id: user
+    prefix: /api/user
+    upstreams:
+      - http: http://user-service:9001
+        weight: 1
+  - id: content
+    prefix: /api/note
+    upstreams:
+      - http: http://content-service:9002
+        weight: 1
+  - id: media
+    prefix: /api/media
+    upstreams:
+      - http: http://media-service:9003
+        weight: 1
+  - id: media-files
+    prefix: /files
+    auth: false
+    upstreams:
+      - http: http://media-service:9003
+        weight: 1
+  - id: social
+    prefix: /api/social
+    upstreams:
+      - http: http://social-service:9004
+        weight: 1
+  - id: notify
+    prefix: /api/notify
+    upstreams:
+      - http: http://notify-service:9005
+        weight: 1
+  - id: feed
+    prefix: /api/feed
+    upstreams:
+      - http: http://feed-service:9006
+        weight: 1
+  - id: search
+    prefix: /api/search
+    upstreams:
+      - http: http://search-service:9007
+        weight: 1
+
+loadbalancer:
+  strategy: round_robin
+  upstreams: []
+
+security:
+  ip_blocklist: []
+
+cors:
+  allow_credentials: true
+  allowed_origins:
+    - http://localhost:5173
+    - http://127.0.0.1:5173

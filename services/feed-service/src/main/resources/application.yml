@@ -1,7 +1,6 @@
 ﻿server:
-  # 仅本机可达，防旁路伪造 X-User-Id；对外只走 Gateway :8080
-  address: 127.0.0.1
-  port: 9006
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:9006}
 
 spring:
   application:
@@ -12,5 +11,5 @@ firefly:
     enabled: true
     hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
-  user-base-url: http://127.0.0.1:9001
-  content-base-url: http://127.0.0.1:9002
+  user-base-url: ${USER_BASE_URL:http://127.0.0.1:9001}
+  content-base-url: ${CONTENT_BASE_URL:http://127.0.0.1:9002}

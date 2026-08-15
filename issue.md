@@ -34,10 +34,10 @@
 
 ## P0｜部署与媒体配置
 
-| ID | 状态 | 风险 | 证据位置 | 上线后果 | 建议方向 |
-|----|------|------|----------|----------|----------|
-| D1 | 未改 | 全本地硬编码：`127.0.0.1`、Windows 路径、固定端口 | 各 `application.yml`；`media.storage-dir: D:/FireFlyData/media` | 容器/多机无法启动或裂图 | 环境变量、`prod` profile、可挂载卷/对象存储 |
-| D2 | 未改 | 无生产 profile；Docker 未编排 Java 业务服务 | 无 `application-prod.yml`；compose 仅网关演示 | 「本机能跑、生产崩」 | 完整 compose/K8s；配置外置 |
+| ID | 状态 | 风险（原问题） | 证据位置 | 当前结论 | 仍待做（若有） |
+|----|------|----------------|----------|----------|----------------|
+| D1 | **已缓解** | 全本地硬编码：`127.0.0.1`、Windows 路径、固定端口 | 各 `application.yml` 现为 `${ENV:本机默认}`；`MEDIA_STORAGE_DIR` / `${user.home}/FireFlyData/media` | 本机仍可开箱；容器/生产用环境变量覆盖；媒体目录可挂卷 | 远期对象存储预签名（与 S8 一致） |
+| D2 | **已缓解** | 无生产 profile；Docker 未编排 Java 业务服务 | 各服务 `application-prod.yml`；`deploy/docker-compose.yml` + `gateway-compose.yaml` | `prod` 绑 `0.0.0.0`、依赖走服务名；compose 编排 infra+Java+网关，媒体卷 `media-data` | K8s / Secret Manager；表结构需另灌 schema |
 
 ---
 
@@ -91,7 +91,7 @@
 ## 建议修复顺序
 
 1. **安全基线剩余**：无（S1–S9 主路径已收口；生产密钥改 Secret Manager）  
-2. **媒体与部署**（D1–D2）：对象存储、配置外置、完整编排  
+2. **媒体与部署剩余**（D1–D2）：对象存储；K8s/Secret Manager；每服务可执行 schema  
 3. **MQ 可靠剩余**：user/social 通知侧 Outbox；监控 DEAD  
 4. **Feed/HTTP 韧性**（R1–R4）：超时、熔断、批量接口、限流调参  
 5. **可观测**（O1–O3）：真实 health、指标、TraceId  
@@ -112,5 +112,7 @@
 | **M1** | Search/Notify 消费失败上抛，不再吞异常 ACK |
 | **M2** | 业务队列 DLX + DLQ；listener 重试 3 次退避 |
 | **M3** | content 笔记 Transactional Outbox（事务内入箱 + Relay 投递） |
+| **D1** | 主机/库/MQ/媒体路径改 `${ENV:默认}`；媒体默认 `${user.home}/FireFlyData/media`，compose 挂 `/data/media` |
+| **D2** | 各服务 `application-prod.yml`；`deploy/docker-compose.yml` 编排 Java+infra+Gateway（`gateway-compose.yaml`） |
 
 网关侧既有正向设计（清客户端 `X-User-Id` 再注入、路由级熔断、笔记 create/delete 的 afterCommit）继续保留。

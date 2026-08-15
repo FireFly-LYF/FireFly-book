@@ -1,7 +1,6 @@
 server:
-  # 仅本机可达，防旁路伪造 X-User-Id；对外只走 Gateway :8080
-  address: 127.0.0.1
-  port: 9003
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:9003}
 
 spring:
   servlet:
@@ -9,8 +8,8 @@ spring:
       max-file-size: 10MB
       max-request-size: 12MB
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/media?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: root
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/media?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
@@ -20,10 +19,11 @@ mybatis:
   type-aliases-package: mediaservice.entity
 
 media:
-  storage-dir: D:/FireFlyData/media
-  public-base-url: http://127.0.0.1:8080/files
+  # 本机默认用 user.home，避免 Windows 盘符冒号与 ${VAR:default} 冲突；生产/容器设 MEDIA_STORAGE_DIR
+  storage-dir: ${MEDIA_STORAGE_DIR:${user.home}/FireFlyData/media}
+  public-base-url: ${MEDIA_PUBLIC_BASE_URL:http://127.0.0.1:8080/files}
   sign-secret: ${MEDIA_SIGN_SECRET}
-  sign-ttl-seconds: 3600
+  sign-ttl-seconds: ${MEDIA_SIGN_TTL_SECONDS:3600}
 
 firefly:
   internal-auth:

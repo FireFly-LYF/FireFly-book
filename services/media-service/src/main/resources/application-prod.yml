@@ -1,0 +1,10 @@
+server:
+  address: ${SERVER_ADDRESS:0.0.0.0}
+
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:${MYSQL_PORT:3306}/media?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+
+media:
+  storage-dir: ${MEDIA_STORAGE_DIR:/data/media}
+  public-base-url: ${MEDIA_PUBLIC_BASE_URL:http://localhost:8080/files}

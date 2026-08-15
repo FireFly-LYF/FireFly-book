@@ -119,9 +119,18 @@ function Start-DockerContainer([string]$Name) {
 
 function Start-ConsoleJob([string]$Title, [string]$WorkDir, [string]$Command) {
     $ps = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-    # 显式把密钥写入子进程，避免部分环境下继承丢失
-    $envBlock = ($RequiredSecrets | ForEach-Object {
+    # 显式把密钥与可选部署变量写入子进程，避免部分环境下继承丢失
+    $passThrough = $RequiredSecrets + @(
+        "MEDIA_STORAGE_DIR",
+        "MEDIA_PUBLIC_BASE_URL",
+        "MYSQL_HOST",
+        "RABBITMQ_HOST",
+        "REDIS_HOST",
+        "SERVER_ADDRESS"
+    )
+    $envBlock = ($passThrough | ForEach-Object {
         $v = [Environment]::GetEnvironmentVariable($_, "Process")
+        if ([string]::IsNullOrEmpty($v)) { return }
         $escaped = $v -replace "'", "''"
         "`$env:$_ = '$escaped'"
     }) -join "; "
@@ -154,10 +163,16 @@ if (-not (Import-DotEnv -Path $envFile)) {
 }
 Assert-RequiredSecrets
 
-$mediaDir = "D:\FireFlyData\media"
+# 媒体目录可外置；未设置时与 application.yml 的 ${user.home}/FireFlyData/media 对齐
+if ([string]::IsNullOrWhiteSpace($env:MEDIA_STORAGE_DIR)) {
+    $env:MEDIA_STORAGE_DIR = Join-Path $env:USERPROFILE "FireFlyData\media"
+}
+$mediaDir = $env:MEDIA_STORAGE_DIR
 if (-not (Test-Path $mediaDir)) {
     New-Item -ItemType Directory -Path $mediaDir -Force | Out-Null
     Write-Host "Created media dir: $mediaDir"
+} else {
+    Write-Host "Media dir: $mediaDir"
 }
 
 if (-not $SkipInfra) {
@@ -293,4 +308,5 @@ Write-Host ""
 Write-Host "  Stop:  .\stop-all.ps1" -ForegroundColor DarkGray
 Write-Host "  Infra: .\start-all.ps1 -InfraOnly"
 Write-Host "  Secrets: .env (from .env.example)" -ForegroundColor DarkGray
+Write-Host "  Compose: docker compose -f deploy/docker-compose.yml --env-file .env up -d --build"
 Write-Host ""

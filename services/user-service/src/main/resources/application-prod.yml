@@ -1,0 +1,9 @@
+# 生产 / Docker：对容器网卡监听；依赖主机名默认与 compose 服务名对齐
+server:
+  address: ${SERVER_ADDRESS:0.0.0.0}
+
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:${MYSQL_PORT:3306}/user?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}

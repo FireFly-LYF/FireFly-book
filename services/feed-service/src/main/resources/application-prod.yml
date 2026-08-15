@@ -1,0 +1,6 @@
+server:
+  address: ${SERVER_ADDRESS:0.0.0.0}
+
+firefly:
+  user-base-url: ${USER_BASE_URL:http://user-service:9001}
+  content-base-url: ${CONTENT_BASE_URL:http://content-service:9002}

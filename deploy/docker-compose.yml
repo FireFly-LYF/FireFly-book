@@ -1,0 +1,219 @@
+# FireFly 全栈编排（基础设施 + Java 业务服务 + Gateway）
+# 用法（仓库根目录）：
+#   1. copy .env.example .env 并填写密钥
+#   2. docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+# 媒体文件落在命名卷 media-data → 容器内 /data/media
+# Java 端口不映射到宿主机，仅 Gateway :8080 对外（与 S1 内网边界一致）
+
+name: firefly
+
+x-java-env: &java-env
+  SPRING_PROFILES_ACTIVE: prod
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  MYSQL_USER: root
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
+  JWT_SECRET: ${JWT_SECRET}
+  MEDIA_SIGN_SECRET: ${MEDIA_SIGN_SECRET}
+  MEDIA_STORAGE_DIR: /data/media
+  MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-http://localhost:8080/files}
+  USER_BASE_URL: http://user-service:9001
+  CONTENT_BASE_URL: http://content-service:9002
+  ES_BASE_URL: http://elasticsearch:9200
+  SERVER_ADDRESS: "0.0.0.0"
+
+x-java-build: &java-build
+  context: ..
+  dockerfile: deploy/Dockerfile.java
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  user-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: user-service
+    environment:
+      <<: *java-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  content-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: content-service
+    environment:
+      <<: *java-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  media-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: media-service
+    environment:
+      <<: *java-env
+    volumes:
+      - media-data:/data/media
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  social-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: social-service
+    environment:
+      <<: *java-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      content-service:
+        condition: service_started
+    restart: unless-stopped
+
+  notify-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: notify-service
+    environment:
+      <<: *java-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  feed-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: feed-service
+    environment:
+      <<: *java-env
+    depends_on:
+      user-service:
+        condition: service_started
+      content-service:
+        condition: service_started
+    restart: unless-stopped
+
+  search-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: search-service
+    environment:
+      <<: *java-env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../Gateway
+      dockerfile: docker/Dockerfile.gateway
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ../Gateway/gateway/internal/config/gateway-compose.yaml:/etc/gateway/gateway.yaml:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - user-service
+      - content-service
+      - media-service
+      - social-service
+      - notify-service
+      - feed-service
+      - search-service
+      - redis
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  media-data:

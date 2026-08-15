@@ -1,15 +1,14 @@
 server:
-  # 仅本机可达，防旁路伪造 X-User-Id；对外只走 Gateway :8080
-  address: 127.0.0.1
-  port: 9007
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:9007}
 
 spring:
   application:
     name: search-service
   rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: guest
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD}
     listener:
       simple:
@@ -29,6 +28,6 @@ firefly:
     hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
   elasticsearch:
-    base-url: http://127.0.0.1:9200
+    base-url: ${ES_BASE_URL:http://127.0.0.1:9200}
     note-index: notes
     user-index: users
