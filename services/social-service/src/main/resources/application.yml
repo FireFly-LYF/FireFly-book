@@ -25,6 +25,12 @@ firefly:
     enabled: true
     hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
+  http:
+    connect-timeout-ms: ${HTTP_CONNECT_TIMEOUT_MS:2000}
+    connection-request-timeout-ms: ${HTTP_CONNECTION_REQUEST_TIMEOUT_MS:1000}
+    read-timeout-ms: ${HTTP_READ_TIMEOUT_MS:3000}
+    max-total: ${HTTP_MAX_TOTAL:100}
+    max-per-route: ${HTTP_MAX_PER_ROUTE:20}
   content:
     base-url: ${CONTENT_BASE_URL:http://127.0.0.1:9002}
 

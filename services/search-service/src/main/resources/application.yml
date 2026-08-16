@@ -27,6 +27,13 @@ firefly:
     enabled: true
     hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
+  # ES 查询可略慢，读超时默认 5s
+  http:
+    connect-timeout-ms: ${HTTP_CONNECT_TIMEOUT_MS:2000}
+    connection-request-timeout-ms: ${HTTP_CONNECTION_REQUEST_TIMEOUT_MS:1000}
+    read-timeout-ms: ${HTTP_READ_TIMEOUT_MS:5000}
+    max-total: ${HTTP_MAX_TOTAL:50}
+    max-per-route: ${HTTP_MAX_PER_ROUTE:20}
   elasticsearch:
     base-url: ${ES_BASE_URL:http://127.0.0.1:9200}
     note-index: notes

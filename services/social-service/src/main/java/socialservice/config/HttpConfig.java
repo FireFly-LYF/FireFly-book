@@ -1,4 +1,4 @@
-package feedservice.config;
+package socialservice.config;
 
 import com.firefly.internalauth.FireflyHttpProperties;
 import com.firefly.internalauth.FireflyRestTemplateFactory;
@@ -10,14 +10,11 @@ import org.springframework.web.client.RestTemplate;
 @Configuration
 public class HttpConfig {
 
-    /**
-     * 出站 HTTP：连接池 + 超时 + 熔断；HMAC 拦截器注入网关身份头。
-     */
     @Bean
     public RestTemplate restTemplate(
             FireflyHttpProperties httpProperties,
             GatewayHmacClientInterceptor hmacInterceptor) {
         return FireflyRestTemplateFactory.create(
-                "feed-downstream", httpProperties, hmacInterceptor);
+                "social-downstream", httpProperties, hmacInterceptor);
     }
 }

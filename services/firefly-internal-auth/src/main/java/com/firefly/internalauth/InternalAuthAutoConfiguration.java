@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Bean;
 
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-@EnableConfigurationProperties(InternalAuthProperties.class)
+@EnableConfigurationProperties({InternalAuthProperties.class, FireflyHttpProperties.class})
 public class InternalAuthAutoConfiguration {
 
     @Bean
