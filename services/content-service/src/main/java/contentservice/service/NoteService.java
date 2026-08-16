@@ -16,7 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class NoteService {
@@ -93,6 +96,47 @@ public class NoteService {
         return noteMapper.listByUser(userId, size, offset);
     }
 
+    /**
+     * 批量拉多位作者最新笔记。限制 userIds≤100、perUser≤20，避免一次打爆库。
+     */
+    public List<Note> listLatestByUsers(List<Long> userIds, int perUser) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        int limitPer = perUser < 1 ? 5 : Math.min(perUser, 20);
+        List<Long> ids = new ArrayList<>(new LinkedHashSet<>(
+                userIds.stream().filter(Objects::nonNull).limit(100).toList()));
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<Note> notes = noteMapper.listLatestByUsers(ids, limitPer);
+        return notes != null ? notes : List.of();
+    }
+
+    /** 按 id 批量查；返回顺序与请求 ids 对齐（缺失则跳过） */
+    public List<Note> listByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ordered = ids.stream().filter(Objects::nonNull).distinct().limit(200).toList();
+        if (ordered.isEmpty()) {
+            return List.of();
+        }
+        List<Note> found = noteMapper.listByIds(ordered);
+        if (found == null || found.isEmpty()) {
+            return List.of();
+        }
+        var byId = found.stream().collect(java.util.stream.Collectors.toMap(Note::getId, n -> n, (a, b) -> a));
+        List<Note> out = new ArrayList<>();
+        for (Long id : ordered) {
+            Note n = byId.get(id);
+            if (n != null) {
+                out.add(n);
+            }
+        }
+        return out;
+    }
+
     @Transactional
     public Note update(Long userId, Long noteId, UpdateNoteRequest req) {
         Note n = requireOwned(userId, noteId);
@@ -124,7 +168,7 @@ public class NoteService {
         noteMediaMapper.deleteByNoteId(noteId);
         noteMapper.delete(noteId);
 
-        enqueueAndKick(MqConstants.RK_NOTE_DELETED, noteId, NoteIndexEvent.deleted(noteId));
+        enqueueAndKick(MqConstants.RK_NOTE_DELETED, noteId, NoteIndexEvent.deleted(noteId, userId));
     }
 
     /**

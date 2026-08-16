@@ -29,7 +29,11 @@ public interface FollowMapper {
             "WHERE f.follower_id = #{userId} ORDER BY f.created_at DESC")
     List<User> findFollowing(@Param("userId") Long userId);
 
-    /** 关注的人 id 列表（Feed 读扩散用） */
+    /** 关注的人 id 列表（Feed 读扩散 / 回填用） */
     @Select("SELECT followee_id FROM follow WHERE follower_id = #{followerId} ORDER BY created_at DESC")
     List<Long> findFollowingIds(@Param("followerId") Long followerId);
+
+    /** 粉丝 id 列表（Feed 写扩散用） */
+    @Select("SELECT follower_id FROM follow WHERE followee_id = #{followeeId} ORDER BY created_at DESC")
+    List<Long> findFollowerIds(@Param("followeeId") Long followeeId);
 }

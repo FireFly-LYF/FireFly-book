@@ -169,6 +169,12 @@ services:
     environment:
       <<: *java-env
     depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
       user-service:
         condition: service_started
       content-service:

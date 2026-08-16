@@ -30,7 +30,7 @@ public class UserClient {
         this.userBaseUrl = userBaseUrl;
     }
 
-    /** 读扩散步骤 1：当前用户关注的人 id */
+    /** 当前用户关注的人 id */
     public List<Long> listFollowingIds(Long userId) {
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -40,20 +40,37 @@ public class UserClient {
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
                     new ParameterizedTypeReference<Map<String, Object>>() {});
-            Map<String, Object> body = resp.getBody();
-            if (body == null || !Integer.valueOf(0).equals(asInt(body.get("code")))) {
-                log.warn("following-ids 失败: {}", body);
-                return Collections.emptyList();
-            }
-            Object data = body.get("data");
-            if (!(data instanceof List<?> list)) {
-                return Collections.emptyList();
-            }
-            return list.stream().map(UserClient::asLong).filter(id -> id != null).toList();
+            return parseIdList(resp.getBody());
         } catch (Exception e) {
             log.warn("调 user following-ids 失败 userId={}: {}", userId, e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    /** 某用户的粉丝 id（写扩散） */
+    public List<Long> listFollowerIds(Long userId) {
+        try {
+            ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                    userBaseUrl + "/api/user/" + userId + "/follower-ids",
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+            return parseIdList(resp.getBody());
+        } catch (Exception e) {
+            log.warn("调 user follower-ids 失败 userId={}: {}", userId, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private static List<Long> parseIdList(Map<String, Object> body) {
+        if (body == null || !Integer.valueOf(0).equals(asInt(body.get("code")))) {
+            return Collections.emptyList();
+        }
+        Object data = body.get("data");
+        if (!(data instanceof List<?> list)) {
+            return Collections.emptyList();
+        }
+        return list.stream().map(UserClient::asLong).filter(id -> id != null).toList();
     }
 
     private static Integer asInt(Object v) {

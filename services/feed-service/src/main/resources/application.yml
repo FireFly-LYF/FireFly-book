@@ -5,6 +5,34 @@
 spring:
   application:
     name: feed-service
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/feed?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD}
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-retries: 3
+          initial-interval: 1000ms
+          multiplier: 2.0
+          max-interval: 10000ms
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  type-aliases-package: feedservice.entity
 
 firefly:
   internal-auth:
@@ -13,3 +41,10 @@ firefly:
     skew-sec: 60
   user-base-url: ${USER_BASE_URL:http://127.0.0.1:9001}
   content-base-url: ${CONTENT_BASE_URL:http://127.0.0.1:9002}
+  feed:
+    # Redis 热缓存保留条数；MySQL 为完整底
+    redis-max-len: ${FEED_REDIS_MAX_LEN:500}
+    # 单次写扩散最多推送粉丝数（教程防大 V 打爆）
+    max-fanout: ${FEED_MAX_FANOUT:2000}
+    # 新关注回填作者最近笔记数
+    backfill-per-author: ${FEED_BACKFILL_PER_AUTHOR:20}

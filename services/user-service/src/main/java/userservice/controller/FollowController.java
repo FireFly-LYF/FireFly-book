@@ -47,7 +47,7 @@ public class FollowController {
         }
     }
 
-    /** Feed 读扩散：当前登录用户关注的人 id 列表 */
+    /** Feed 读扩散 / 回填：当前登录用户关注的人 id 列表 */
     @GetMapping("/me/following-ids")
     public ApiResponse<List<Long>> myFollowingIds(
             @RequestHeader(value = "X-User-Id", required = false) Long userId) {
@@ -56,6 +56,16 @@ public class FollowController {
         }
         try {
             return ApiResponse.ok(followService.listFollowingIds(userId));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.fail(40401, e.getMessage());
+        }
+    }
+
+    /** Feed 写扩散：某用户的粉丝 id 列表 */
+    @GetMapping("/{id}/follower-ids")
+    public ApiResponse<List<Long>> followerIds(@PathVariable Long id) {
+        try {
+            return ApiResponse.ok(followService.listFollowerIds(id));
         } catch (IllegalArgumentException e) {
             return ApiResponse.fail(40401, e.getMessage());
         }

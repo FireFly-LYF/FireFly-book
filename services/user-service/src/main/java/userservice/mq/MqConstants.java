@@ -11,6 +11,8 @@ public final class MqConstants {
     public static final String RK_LIKE_CREATED = "like.created";
     public static final String RK_COMMENT_CREATED = "comment.created";
     public static final String RK_FOLLOW_CREATED = "follow.created";
+    /** 取消关注 → Feed 清理 inbox（notify 不订阅） */
+    public static final String RK_FOLLOW_DELETED = "follow.deleted";
 
     /** 用户资料变更 → search 写 users 索引 */
     public static final String EXCHANGE_USER = "firefly.user";

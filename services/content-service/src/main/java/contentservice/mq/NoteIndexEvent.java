@@ -22,8 +22,13 @@ public class NoteIndexEvent {
     }
 
     public static NoteIndexEvent deleted(Long id) {
+        return deleted(id, null);
+    }
+
+    public static NoteIndexEvent deleted(Long id, Long userId) {
         NoteIndexEvent e = new NoteIndexEvent();
         e.id = id;
+        e.userId = userId;
         return e;
     }
 

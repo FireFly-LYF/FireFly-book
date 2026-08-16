@@ -45,7 +45,7 @@
 
 | ID | 状态 | 风险 | 证据位置 | 上线后果 | 建议方向 |
 |----|------|------|----------|----------|----------|
-| R1 | 未改 | Feed 读扩散：关注数 × HTTP | `FeedService.followingFeed` → `contentClient.listByUser` | 关注多则延迟线性恶化，易拖垮 | 批量拉笔记 / 写扩散时间线；限制扫描上限 |
+| R1 | **已缓解** | Feed 读扩散：关注数 × HTTP | `feed_inbox` + Redis + MQ 写扩散；空则回退批量读扩散 | 读走时间线；写推粉丝；大 V 有 max-fanout 截断 | 大 V 混合读扩散；历史 inbox 离线回填 |
 | R2 | 未改 | Java 侧 `RestTemplate` 裸建、无超时/熔断 | `HttpConfig` / `AppConfig` 等 `new RestTemplate()` | 下游挂起占满线程池，雪崩 | 连接/读超时；Resilience4j |
 | R3 | 未改 | 网关 ReverseProxy 无显式超时 | `proxy/http.go` | 慢上游占满代理连接 | Transport Timeout + 与熔断联动 |
 | R4 | 未改 | 限流阈值极大（形同关闭） | `gateway.yaml` `rate: 100000` | 登录/上传/搜索易被刷 | 按路由/用户/IP 分级限流 |
@@ -93,7 +93,7 @@
 1. **安全基线剩余**：无（S1–S9 主路径已收口；生产密钥改 Secret Manager）  
 2. **媒体与部署剩余**（D1–D2）：对象存储；K8s/Secret Manager；每服务可执行 schema  
 3. **MQ 可靠剩余**：user/social 通知侧 Outbox；监控 DEAD  
-4. **Feed/HTTP 韧性**（R1–R4）：超时、熔断、批量接口、限流调参  
+4. **Feed/HTTP 韧性剩余**（R2–R4）：超时、熔断、限流调参；R1 已写扩散+读缓存  
 5. **可观测**（O1–O3）：真实 health、指标、TraceId  
 
 ### 已处理（勿再当未改项排期）
@@ -114,5 +114,6 @@
 | **M3** | content 笔记 Transactional Outbox（事务内入箱 + Relay 投递） |
 | **D1** | 主机/库/MQ/媒体路径改 `${ENV:默认}`；媒体默认 `${user.home}/FireFlyData/media`，compose 挂 `/data/media` |
 | **D2** | 各服务 `application-prod.yml`；`deploy/docker-compose.yml` 编排 Java+infra+Gateway（`gateway-compose.yaml`） |
+| **R1** | Feed 写扩散：`feed_inbox`(MySQL)+Redis ZSet；消费 note/follow 事件；读路径缓存→inbox→批量水合，空则读扩散回退 |
 
 网关侧既有正向设计（清客户端 `X-User-Id` 再注入、路由级熔断、笔记 create/delete 的 afterCommit）继续保留。

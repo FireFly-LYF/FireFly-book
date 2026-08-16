@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,7 @@ import org.springframework.web.client.RestTemplate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,7 +34,47 @@ public class ContentClient {
         this.contentBaseUrl = contentBaseUrl;
     }
 
-    /** 读扩散步骤 3：拉某作者最近笔记 */
+    /** 时间线水合：按 id 批量拉笔记（顺序与 ids 一致） */
+    public List<FeedItem> listByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("ids", ids);
+            ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                    contentBaseUrl + "/api/note/ids",
+                    HttpMethod.POST,
+                    new HttpEntity<>(body),
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+            return parseNoteList(resp.getBody());
+        } catch (Exception e) {
+            log.warn("调 content listByIds 失败 size={}: {}", ids.size(), e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /** 读扩散回退 / 关注回填 */
+    public List<FeedItem> listLatestByUsers(List<Long> userIds, int perUser) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("userIds", userIds);
+            body.put("perUser", perUser);
+            ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                    contentBaseUrl + "/api/note/users/latest",
+                    HttpMethod.POST,
+                    new HttpEntity<>(body),
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+            return parseNoteList(resp.getBody());
+        } catch (Exception e) {
+            log.warn("调 content listLatestByUsers 失败 size={}: {}", userIds.size(), e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
     public List<FeedItem> listByUser(Long userId, int page, int size) {
         try {
             String url = contentBaseUrl + "/api/note/user/" + userId + "?page=" + page + "&size=" + size;
@@ -41,23 +83,26 @@ public class ContentClient {
                     HttpMethod.GET,
                     null,
                     new ParameterizedTypeReference<Map<String, Object>>() {});
-            Map<String, Object> body = resp.getBody();
-            if (body == null || !Integer.valueOf(0).equals(asInt(body.get("code")))) {
-                return Collections.emptyList();
-            }
-            Object data = body.get("data");
-            if (!(data instanceof List<?> list)) {
-                return Collections.emptyList();
-            }
-            return list.stream()
-                    .filter(Map.class::isInstance)
-                    .map(o -> toItem((Map<?, ?>) o))
-                    .filter(item -> item.getNoteId() != null)
-                    .toList();
+            return parseNoteList(resp.getBody());
         } catch (Exception e) {
             log.warn("调 content listByUser 失败 userId={}: {}", userId, e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    private static List<FeedItem> parseNoteList(Map<String, Object> body) {
+        if (body == null || !Integer.valueOf(0).equals(asInt(body.get("code")))) {
+            return Collections.emptyList();
+        }
+        Object data = body.get("data");
+        if (!(data instanceof List<?> list)) {
+            return Collections.emptyList();
+        }
+        return list.stream()
+                .filter(Map.class::isInstance)
+                .map(o -> toItem((Map<?, ?>) o))
+                .filter(item -> item.getNoteId() != null)
+                .toList();
     }
 
     private static FeedItem toItem(Map<?, ?> n) {

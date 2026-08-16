@@ -46,6 +46,10 @@ public class FollowService {
         if (followMapper.delete(followerId, followeeId) == 0) {
             throw new IllegalArgumentException("未关注该用户");
         }
+        // userId=被取关者, fromUserId=取关者（与 follow 事件字段对齐，供 Feed 清 inbox）
+        NotifyEvent event = new NotifyEvent(
+                followeeId, followerId, "UNFOLLOW", null, "取消关注");
+        notifyEventPublisher.publish(MqConstants.RK_FOLLOW_DELETED, event);
     }
 
     public List<User> listFollowers(Long userId) {
@@ -61,6 +65,12 @@ public class FollowService {
     public List<Long> listFollowingIds(Long userId) {
         requireUser(userId);
         List<Long> ids = followMapper.findFollowingIds(userId);
+        return ids != null ? ids : List.of();
+    }
+
+    public List<Long> listFollowerIds(Long userId) {
+        requireUser(userId);
+        List<Long> ids = followMapper.findFollowerIds(userId);
         return ids != null ? ids : List.of();
     }
 

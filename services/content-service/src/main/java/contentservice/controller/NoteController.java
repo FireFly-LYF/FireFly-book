@@ -1,6 +1,8 @@
 package contentservice.controller;
 
 import contentservice.common.ApiResponse;
+import contentservice.dto.BatchByIdsRequest;
+import contentservice.dto.BatchLatestByUsersRequest;
 import contentservice.dto.CreateNoteRequest;
 import contentservice.dto.NoteDetailResponse;
 import contentservice.dto.UpdateNoteRequest;
@@ -37,6 +39,25 @@ public class NoteController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.ok(noteService.listByUser(userId, page, size));
+    }
+
+    /** Feed 读扩散：一次拉取多位作者最新笔记（userIds≤100） */
+    @PostMapping("/users/latest")
+    public ApiResponse<List<Note>> listLatestByUsers(@RequestBody BatchLatestByUsersRequest req) {
+        if (req == null || req.getUserIds() == null || req.getUserIds().isEmpty()) {
+            return ApiResponse.ok(List.of());
+        }
+        int perUser = req.getPerUser() != null ? req.getPerUser() : 5;
+        return ApiResponse.ok(noteService.listLatestByUsers(req.getUserIds(), perUser));
+    }
+
+    /** Feed 时间线水合：按 id 批量查（顺序与请求一致） */
+    @PostMapping("/ids")
+    public ApiResponse<List<Note>> listByIds(@RequestBody BatchByIdsRequest req) {
+        if (req == null || req.getIds() == null || req.getIds().isEmpty()) {
+            return ApiResponse.ok(List.of());
+        }
+        return ApiResponse.ok(noteService.listByIds(req.getIds()));
     }
 
     @GetMapping("/{id}")
