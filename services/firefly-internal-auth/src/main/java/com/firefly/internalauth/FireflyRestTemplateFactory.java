@@ -66,7 +66,7 @@ public final class FireflyRestTemplateFactory {
         HttpComponentsClientHttpRequestFactory factory =
                 new HttpComponentsClientHttpRequestFactory(httpClient);
         RestTemplate rt = new RestTemplate(factory);
-
+        //Resilience4j 熔断器
         CircuitBreaker circuitBreaker = CircuitBreaker.of(name, circuitBreakerConfig(p));
         List<ClientHttpRequestInterceptor> interceptors = new ArrayList<>();
         if (extraInterceptors != null) {

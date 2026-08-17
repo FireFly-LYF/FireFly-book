@@ -47,8 +47,8 @@
 |----|------|------|----------|----------|----------|
 | R1 | **已缓解** | Feed 读扩散：关注数 × HTTP | `feed_inbox` + Redis + MQ 写扩散；空则回退批量读扩散 | 读走时间线；写推粉丝；大 V 有 max-fanout 截断 | 大 V 混合读扩散；历史 inbox 离线回填 |
 | R2 | **已缓解** | Java 侧 `RestTemplate` 裸建、无超时/熔断 | `FireflyRestTemplateFactory`：HttpClient5 池 + 超时 + Resilience4j | 下游挂起不再无限占线程；失败率高则熔断 | 可按下游拆分熔断器；指标暴露 |
-| R3 | 未改 | 网关 ReverseProxy 无显式超时 | `proxy/http.go` | 慢上游占满代理连接 | Transport Timeout + 与熔断联动 |
-| R4 | 未改 | 限流阈值极大（形同关闭） | `gateway.yaml` `rate: 100000` | 登录/上传/搜索易被刷 | 按路由/用户/IP 分级限流 |
+| R3 | **已修复** | 网关 ReverseProxy 无显式超时 | `proxy/http.go` Transport + ErrorHandler | Dial 3s + ResponseHeaderTimeout（默认 10s）；超时 504 计入熔断 | 可按路由细分超时；暴露超时/熔断指标 |
+| R4 | **已修复** | 限流阈值极大（形同关闭） | `gateway.yaml` + `ratelimit`/`middleware` | 默认 30/60；login/register/media/search 更严；按 user/IP | 生产可按租户再拆；监控 429 |
 | R5 | 未改 | ES 搜索带 wildcard `*q*` | `ElasticsearchRestClient.search` | 大数据量下 CPU/延迟差，慢查询打挂 | IK 分词；限 q 长度；禁前导通配 |
 | R6 | 未改 | 无 Hikari 显式调优；业务缓存几乎空白 | 各 datasource 仅基础配置 | 流量上涨时连接池/热点不足 | 按实例调池；热点用户/笔记缓存 |
 
@@ -93,7 +93,7 @@
 1. **安全基线剩余**：无（S1–S9 主路径已收口；生产密钥改 Secret Manager）  
 2. **媒体与部署剩余**（D1–D2）：对象存储；K8s/Secret Manager；每服务可执行 schema  
 3. **MQ 可靠剩余**：user/social 通知侧 Outbox；监控 DEAD  
-4. **Feed/HTTP 韧性剩余**（R3–R4）：网关超时与限流；R1/R2 已处理  
+4. **Feed/HTTP 韧性剩余**：无（R1–R4 已处理）  
 5. **可观测**（O1–O3）：真实 health、指标、TraceId  
 
 ### 已处理（勿再当未改项排期）
@@ -116,5 +116,7 @@
 | **D2** | 各服务 `application-prod.yml`；`deploy/docker-compose.yml` 编排 Java+infra+Gateway（`gateway-compose.yaml`） |
 | **R1** | Feed 写扩散：`feed_inbox`(MySQL)+Redis ZSet；消费 note/follow 事件；读路径缓存→inbox→批量水合，空则读扩散回退 |
 | **R2** | RestTemplate：HttpClient5 连接池 + connect/read 超时 + Resilience4j 熔断（`FireflyRestTemplateFactory`） |
+| **R3** | 网关 ReverseProxy：`ResponseHeaderTimeout` + 超时 504 计入熔断 |
+| **R4** | 限流：合理默认阈值 + `key_by=user_ip` + 路由级 `routes`（login/register/media/search） |
 
 网关侧既有正向设计（清客户端 `X-User-Id` 再注入、路由级熔断、笔记 create/delete 的 afterCommit）继续保留。

@@ -36,9 +36,32 @@ redis:
   addr: "localhost:6379"
 
 ratelimit:
-  rate:  100000
-  capacity: 100000
-  daily_limit: 100000000
+  # 默认：每用户/IP 约 30 QPS，突发 60；日配额 2 万
+  rate: 30
+  capacity: 60
+  daily_limit: 20000
+  # user_ip=登录按 userId，未登录按 IP；也可 ip | tenant
+  key_by: user_ip
+  # 敏感路径更严（最长前缀优先）
+  routes:
+    - prefix: /api/user/login
+      rate: 5
+      capacity: 10
+    - prefix: /api/user/register
+      rate: 3
+      capacity: 6
+    - prefix: /api/user/refresh
+      rate: 10
+      capacity: 20
+    - prefix: /api/media
+      rate: 10
+      capacity: 20
+    - prefix: /api/search
+      rate: 10
+      capacity: 20
+    - prefix: /files
+      rate: 40
+      capacity: 80
 
 circuit_breaker:
   threshold: 5
@@ -52,6 +75,8 @@ registry:
 # 保留完整路径：/api/user/** → Java @RequestMapping("/api/user")
 proxy:
   strip_prefix: ""
+  # 等待上游响应头超时；超时返回 504 并计入熔断（响应体仍可流式转发）
+  response_header_timeout_sec: 10
 
 # 按路径转发到不同 Java 服务（第 13 章）
 routes:

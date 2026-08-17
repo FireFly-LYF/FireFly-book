@@ -32,9 +32,29 @@ redis:
   addr: "redis:6379"
 
 ratelimit:
-  rate: 100000
-  capacity: 100000
-  daily_limit: 100000000
+  rate: 30
+  capacity: 60
+  daily_limit: 20000
+  key_by: user_ip
+  routes:
+    - prefix: /api/user/login
+      rate: 5
+      capacity: 10
+    - prefix: /api/user/register
+      rate: 3
+      capacity: 6
+    - prefix: /api/user/refresh
+      rate: 10
+      capacity: 20
+    - prefix: /api/media
+      rate: 10
+      capacity: 20
+    - prefix: /api/search
+      rate: 10
+      capacity: 20
+    - prefix: /files
+      rate: 40
+      capacity: 80
 
 circuit_breaker:
   threshold: 5
@@ -46,6 +66,7 @@ registry:
 
 proxy:
   strip_prefix: ""
+  response_header_timeout_sec: 10
 
 routes:
   - id: user

@@ -10,7 +10,7 @@ import org.springframework.web.client.ResourceAccessException;
 
 import java.io.IOException;
 
-/** 将 RestTemplate 调用包进 Resilience4j CircuitBreaker；熔断打开时快速失败。 */
+/** 将 RestTemplate 调用封装进 Resilience4j CircuitBreaker；熔断打开时快速失败。 */
 public class CircuitBreakerInterceptor implements ClientHttpRequestInterceptor {
 
     private final CircuitBreaker circuitBreaker;

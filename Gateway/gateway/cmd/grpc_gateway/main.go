@@ -39,7 +39,11 @@ func main() {
 	} else {
 		client = candidate
 	}
-	limiter := ratelimit.NewLimiter(client, cfg.RateLimitRate(), cfg.RateLimitCapacity(), cfg.RateLimitDailyLimit())
+	routes := make([]ratelimit.RouteQuota, 0, len(cfg.RateLimit.Routes))
+	for _, r := range cfg.RateLimitRouteQuotas() {
+		routes = append(routes, ratelimit.RouteQuota{Prefix: r.Prefix, Rate: r.Rate, Capacity: r.Capacity})
+	}
+	limiter := ratelimit.NewLimiter(client, cfg.RateLimitRate(), cfg.RateLimitCapacity(), cfg.RateLimitDailyLimit(), cfg.RateLimitKeyBy(), routes)
 	var breaker *registry.CircuitBreaker
 	if cfg.CircuitBreakerEnabled() {
 		breaker = registry.NewCircuitBreaker(cfg.CBThreshold(), cfg.CBCooldown())

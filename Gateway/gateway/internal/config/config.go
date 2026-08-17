@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"gateway/internal/lb"
@@ -43,10 +44,12 @@ type Config struct {
 	grpcBalancer   lb.Balancer   // gRPC 负载均衡器，grpc director 调用
 }
 
-// ProxyConfig 控制反向代理路径改写。
+// ProxyConfig 控制反向代理路径改写与上游超时。
 // StripPrefix 非空时剥离此前缀（旧演示：/api）；空则保留完整路径（FireFly Java：/api/user/...）。
 type ProxyConfig struct {
 	StripPrefix string `yaml:"strip_prefix"`
+	// ResponseHeaderTimeoutSec 等待上游响应头的秒数；超时记熔断失败。<=0 时用默认 10。
+	ResponseHeaderTimeoutSec int `yaml:"response_header_timeout_sec"`
 }
 
 // RouteConfig 按路径前缀转发到独立 upstream 组。
@@ -62,9 +65,19 @@ type RedisConfig struct {
 }
 
 type RateLimitConfig struct {
-	Rate       int64 `yaml:"rate"`        // 令牌桶：每秒补充令牌数（平均 QPS）
-	Capacity   int64 `yaml:"capacity"`    // 令牌桶：桶容量（突发上限）
-	DailyLimit int64 `yaml:"daily_limit"` // 每租户每日请求上限（QPD），0 表示不限制
+	Rate       int64 `yaml:"rate"`        // 默认：每秒补充令牌数（平均 QPS）
+	Capacity   int64 `yaml:"capacity"`    // 默认：令牌桶容量（突发上限）
+	DailyLimit int64 `yaml:"daily_limit"` // 每个限流键每日上限（QPD），0 表示不限制
+	// KeyBy 限流键：user_ip（登录用户按 userId，否则按 IP）| ip | tenant
+	KeyBy  string                 `yaml:"key_by"`
+	Routes []RateLimitRouteConfig `yaml:"routes"` // 按路径前缀覆盖配额；最长前缀优先
+}
+
+// RateLimitRouteConfig 单条路径的 QPS/突发配额；未写的字段回落到全局 rate/capacity。
+type RateLimitRouteConfig struct {
+	Prefix   string `yaml:"prefix"`
+	Rate     int64  `yaml:"rate"`
+	Capacity int64  `yaml:"capacity"`
 }
 
 type ServerConfig struct {
@@ -237,13 +250,17 @@ func defaultConfig() *Config {
 		},
 		Redis: RedisConfig{Addr: "localhost:6379"},
 		RateLimit: RateLimitConfig{
-			Rate:       5,
-			Capacity:   5,
-			DailyLimit: 10000,
+			Rate:       30,
+			Capacity:   60,
+			DailyLimit: 20000,
+			KeyBy:      "user_ip",
 		},
 		CircuitBreaker: CircuitBreakerConfig{
 			Threshold:   5,
 			CooldownSec: 30,
+		},
+		Proxy: ProxyConfig{
+			ResponseHeaderTimeoutSec: 10,
 		},
 		Registry: RegistryConfig{Type: "memory"},
 		LoadBalancer: LBConfig{
@@ -397,6 +414,15 @@ func (c *Config) StripPrefix() string {
 	return c.Proxy.StripPrefix
 }
 
+// ProxyResponseHeaderTimeout 等待上游响应头的超时；默认 10s。
+func (c *Config) ProxyResponseHeaderTimeout() time.Duration {
+	sec := c.Proxy.ResponseHeaderTimeoutSec
+	if sec <= 0 {
+		sec = 10
+	}
+	return time.Duration(sec) * time.Second
+}
+
 // HasHTTPRoutes 是否启用按路径路由表。
 func (c *Config) HasHTTPRoutes() bool {
 	return len(c.Routes) > 0
@@ -454,6 +480,43 @@ func (c *Config) RateLimitCapacity() int64 {
 // RateLimitDailyLimit 返回日配额上限；0 表示 middleware 不启用 QPD 检查。
 func (c *Config) RateLimitDailyLimit() int64 {
 	return c.RateLimit.DailyLimit
+}
+
+// RateLimitKeyBy 限流键策略；空或未知时按 user_ip。
+func (c *Config) RateLimitKeyBy() string {
+	switch strings.ToLower(strings.TrimSpace(c.RateLimit.KeyBy)) {
+	case "ip":
+		return "ip"
+	case "tenant":
+		return "tenant"
+	default:
+		return "user_ip"
+	}
+}
+
+// RateLimitRouteQuotas 路由级配额（已规范化 rate/capacity）；最长前缀匹配由 Limiter 负责。
+func (c *Config) RateLimitRouteQuotas() []RateLimitRouteConfig {
+	out := make([]RateLimitRouteConfig, 0, len(c.RateLimit.Routes))
+	defRate := c.RateLimitRate()
+	for _, r := range c.RateLimit.Routes {
+		prefix := strings.TrimSpace(r.Prefix)
+		if prefix == "" {
+			continue
+		}
+		rate := r.Rate
+		if rate <= 0 {
+			rate = defRate
+		}
+		cap := r.Capacity
+		if cap <= 0 {
+			cap = rate
+		}
+		if cap < rate {
+			cap = rate
+		}
+		out = append(out, RateLimitRouteConfig{Prefix: prefix, Rate: rate, Capacity: cap})
+	}
+	return out
 }
 
 // CBThreshold 返回熔断连续失败阈值；<=0 时默认 5，且 middleware 可据此跳过挂载。

@@ -19,7 +19,7 @@ ES 适合全文检索；MySQL 继续做「权威数据源」，ES 做「搜索�
 ## 步骤 1：本地起 ES（Docker）
 
 ```powershell
-docker run -d --name ff-es -p 9200:9200 -e "discovery.type=single-node" -e "xpack.security.enabled=false" elasticsearch:8.12.0
+docker run -d --name es -p 9200:9200 -e "discovery.type=single-node" -e "xpack.security.enabled=false" elasticsearch:8.12.0
 ```
 
 浏览器打开 http://127.0.0.1:9200 有 JSON 即成功。

@@ -2,7 +2,9 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -26,30 +28,35 @@ const (
 )
 
 // Handler 返回 HTTP 反向代理 Gin 中间件（单一 LB 池，兼容旧配置）。
-func Handler(b lb.Balancer, cb *registry.CircuitBreaker, hmacSecret []byte) gin.HandlerFunc {
-	return HandlerWithOptions(b, cb, "", hmacSecret)
+func Handler(b lb.Balancer, cb *registry.CircuitBreaker, hmacSecret []byte, responseHeaderTimeout time.Duration) gin.HandlerFunc {
+	return HandlerWithOptions(b, cb, "", hmacSecret, responseHeaderTimeout)
 }
 
 // HandlerWithOptions 支持配置路径剥离前缀。
 // stripPrefix 非空时剥离（如 /api）；空则保留完整路径（FireFly Java Controller）。
-func HandlerWithOptions(b lb.Balancer, cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte) gin.HandlerFunc {
+func HandlerWithOptions(b lb.Balancer, cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte, responseHeaderTimeout time.Duration) gin.HandlerFunc {
 	return newProxyHandler(func(c *gin.Context) (lb.Balancer, bool) {
 		return b, b != nil
-	}, cb, stripPrefix, hmacSecret)
+	}, cb, stripPrefix, hmacSecret, responseHeaderTimeout)
 }
 
 // RouteHandler 按路径前缀选择不同 LB 池。
-func RouteHandler(router *registry.HTTPRouter, cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte) gin.HandlerFunc {
+func RouteHandler(router *registry.HTTPRouter, cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte, responseHeaderTimeout time.Duration) gin.HandlerFunc {
 	return newProxyHandler(func(c *gin.Context) (lb.Balancer, bool) {
 		route, ok := router.Match(c.Request.URL.Path)
 		if !ok {
 			return nil, false
 		}
 		return route.Balancers.HTTP, true
-	}, cb, stripPrefix, hmacSecret)
+	}, cb, stripPrefix, hmacSecret, responseHeaderTimeout)
 }
 
-func newProxyHandler(pickBalancer func(*gin.Context) (lb.Balancer, bool), cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte) gin.HandlerFunc {
+func newProxyHandler(pickBalancer func(*gin.Context) (lb.Balancer, bool), cb *registry.CircuitBreaker, stripPrefix string, hmacSecret []byte, responseHeaderTimeout time.Duration) gin.HandlerFunc {
+	if responseHeaderTimeout <= 0 {
+		responseHeaderTimeout = 10 * time.Second
+	}
+	transport := newProxyTransport(responseHeaderTimeout)
+
 	var mu sync.Mutex
 	cache := map[string]*httputil.ReverseProxy{}
 
@@ -68,6 +75,8 @@ func newProxyHandler(pickBalancer func(*gin.Context) (lb.Balancer, bool), cb *re
 			Rewrite: func(pr *httputil.ProxyRequest) {
 				rewrite(pr, remote, stripPrefix, secret)
 			},
+			Transport:    transport,
+			ErrorHandler: proxyErrorHandler,
 		}
 		cache[target] = p
 		return p, nil
@@ -95,9 +104,49 @@ func newProxyHandler(pickBalancer func(*gin.Context) (lb.Balancer, bool), cb *re
 		}
 		p.ServeHTTP(c.Writer, proxyReq(c))
 		if cb != nil {
+			// 5xx（含超时 504）计入熔断；连续失败达阈值后开路
 			cb.Record(target, c.Writer.Status() >= 500)
 		}
 	}
+}
+
+// newProxyTransport 出站 Transport：拨号超时 + 等待响应头超时（慢上游不再无限占连接）。
+// 仅限制「等到响应头」；响应体仍可流式转发（适合 /files 大文件）。
+func newProxyTransport(responseHeaderTimeout time.Duration) *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   3 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   20,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: responseHeaderTimeout,
+	}
+}
+
+// proxyErrorHandler 上游不可达 / 超时 → 502/504，供后续 cb.Record 按 status>=500 记失败。
+func proxyErrorHandler(rw http.ResponseWriter, _ *http.Request, err error) {
+	status := http.StatusBadGateway
+	if isTimeoutErr(err) {
+		status = http.StatusGatewayTimeout
+	}
+	http.Error(rw, http.StatusText(status), status)
+}
+
+func isTimeoutErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
 }
 
 // proxyReq 把 Gin 中间件链上的 tenant / clientIP / userId 注入 request.Context。

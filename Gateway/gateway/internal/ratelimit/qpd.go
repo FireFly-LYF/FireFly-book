@@ -8,16 +8,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func QPDAllow(ctx context.Context, rdb *redis.Client, tenant string, dailyLimit int64) (bool, error) {
+func QPDAllow(ctx context.Context, rdb *redis.Client, key string, dailyLimit int64) (bool, error) {
 	day := time.Now().Format("20060102")
-	key := fmt.Sprintf("ratelimit:qpd:%s:%s", tenant, day)
+	redisKey := fmt.Sprintf("ratelimit:qpd:%s:%s", key, day)
 
-	n, err := rdb.Incr(ctx, key).Result()
+	n, err := rdb.Incr(ctx, redisKey).Result()
 	if err != nil {
 		return false, err
 	}
 	if n == 1 {
-		_ = rdb.Expire(ctx, key, 48*time.Hour).Err()
+		_ = rdb.Expire(ctx, redisKey, 48*time.Hour).Err()
 	}
 	return n <= dailyLimit, nil
 }

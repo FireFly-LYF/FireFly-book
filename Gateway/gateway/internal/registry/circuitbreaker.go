@@ -38,7 +38,7 @@ func (c *CircuitBreaker) Allow(node string) bool {
 	return !time.Now().Before(st.openUntil)
 }
 
-// Record 转发后上报结果；failed=true 表示下游失败（HTTP 5xx、gRPC error、TCP dial 失败等）。
+// Record 转发后上报结果；failed=true 表示下游失败（HTTP 5xx/超时 504、gRPC error、TCP dial 失败等）。
 func (c *CircuitBreaker) Record(node string, failed bool) {
 	if c == nil || c.threshold <= 0 || node == "" {
 		return

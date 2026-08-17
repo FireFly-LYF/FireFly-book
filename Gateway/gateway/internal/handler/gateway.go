@@ -64,11 +64,12 @@ func (g *Gateway) Register(r *gin.Engine) {
 
 	strip := g.cfg.StripPrefix()
 	hmacSecret := g.cfg.InternalHMACSecret()
+	proxyTimeout := g.cfg.ProxyResponseHeaderTimeout()
 	var proxyHandler gin.HandlerFunc
 	if g.router != nil {
-		proxyHandler = proxy.RouteHandler(g.router, g.breaker, strip, hmacSecret)
+		proxyHandler = proxy.RouteHandler(g.router, g.breaker, strip, hmacSecret, proxyTimeout)
 	} else {
-		proxyHandler = proxy.HandlerWithOptions(g.balancers.HTTP, g.breaker, strip, hmacSecret)
+		proxyHandler = proxy.HandlerWithOptions(g.balancers.HTTP, g.breaker, strip, hmacSecret, proxyTimeout)
 	}
 
 	api := r.Group("/api")

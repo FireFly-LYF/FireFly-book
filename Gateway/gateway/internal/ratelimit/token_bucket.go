@@ -28,10 +28,10 @@ return 1
 
 var tokenBucketScript = redis.NewScript(tokenBucketLua)
 
-func TokenBucketAllow(ctx context.Context, rdb *redis.Client, tenant string, rate, capacity int64) (bool, error) {
-	key := fmt.Sprintf("ratelimit:bucket:%s", tenant)
+func TokenBucketAllow(ctx context.Context, rdb *redis.Client, key string, rate, capacity int64) (bool, error) {
+	redisKey := fmt.Sprintf("ratelimit:bucket:%s", key)
 	now := time.Now().UnixMilli()
-	n, err := tokenBucketScript.Run(ctx, rdb, []string{key}, now, rate, capacity).Int()
+	n, err := tokenBucketScript.Run(ctx, rdb, []string{redisKey}, now, rate, capacity).Int()
 	if err != nil {
 		return false, err
 	}
