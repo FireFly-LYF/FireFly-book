@@ -65,6 +65,16 @@ SET NX + TTL 或直接用 Set：note:liked:users:{noteId}
 取消：`DELETE` 成功后 `DECR`。  
 `GET /api/social/like/{noteId}/count` 优先读 Redis，未命中再查库并回写（TTL 24h）。
 
+**用户资料 / 笔记（已在 user-service、content-service 落地）：**
+
+```text
+Key: user:info:{id}     TTL 10 分钟
+Key: note:info:{id}     TTL 10 分钟
+```
+
+`GET /api/user/{id}`、`GET /api/user/me`：先 Redis，未命中查库并回写（不缓存密码）。改资料后删 key。  
+`GET /api/note/{id}`、Feed 批量 `/api/note/ids`：同样先缓存；更新/删除笔记后删 key。Redis 挂了则直接打 MySQL。
+
 ---
 
 ## 二、消息队列（选一个学）

@@ -26,15 +26,23 @@ public class SearchIndexService {
         this.props = props;
     }
 
-    /** 启动时确保索引存在，并给 title/content 挂 keyword 子字段供 wildcard */
+    /**
+     * 启动时确保索引存在（IK：ik_max_word 索引 / ik_smart 搜索）。
+     * 旧索引无 IK mapping 时设 firefly.elasticsearch.recreate-indices=true 重建一次。
+     */
     @PostConstruct
     public void initIndices() {
         try {
-            es.ensureIndex(props.getNoteIndex(), textFieldsMapping("title", "content", "coverUrl"));
-            es.ensureIndex(props.getUserIndex(), textFieldsMapping("username", "nickname", "avatarUrl"));
+            if (props.isRecreateIndices()) {
+                log.warn("recreate-indices=true：将删除并重建 ES 索引（搜索数据需重新同步）");
+                es.deleteIndex(props.getNoteIndex());
+                es.deleteIndex(props.getUserIndex());
+            }
+            es.ensureIndex(props.getNoteIndex(), noteIndexMapping());
+            es.ensureIndex(props.getUserIndex(), userIndexMapping());
         } catch (Exception e) {
             // 启动不因 ES 短暂不可用而直接挂掉，方便本地排错
-            log.warn("初始化 ES 索引失败（请确认 ES 已启动）: {}", e.getMessage());
+            log.warn("初始化 ES 索引失败（请确认 ES 已启动且已安装 IK）: {}", e.getMessage());
         }
     }
 
@@ -63,7 +71,7 @@ public class SearchIndexService {
     }
 
     public List<NoteDocument> searchNotes(String q, int page, int size) {
-        requireKeyword(q);
+        String keyword = normalizeKeyword(q);
         if (page < 1) {
             page = 1;
         }
@@ -71,34 +79,57 @@ public class SearchIndexService {
             size = 10;
         }
         int from = (page - 1) * size;
-        return es.search(props.getNoteIndex(), List.of("title", "content"), q.trim(), from, size, NoteDocument.class);
+        return es.search(props.getNoteIndex(), List.of("title", "content"), keyword, from, size, NoteDocument.class);
     }
 
     public List<UserDocument> searchUsers(String q) {
-        requireKeyword(q);
-        return es.search(props.getUserIndex(), List.of("nickname", "username"), q.trim(), 0, 20, UserDocument.class);
+        String keyword = normalizeKeyword(q);
+        return es.search(props.getUserIndex(), List.of("nickname", "username"), keyword, 0, 20, UserDocument.class);
     }
 
-    private static void requireKeyword(String q) {
+    /** 非空、限长、禁止以 * / ? 开头（避免前导通配打挂 ES） */
+    private String normalizeKeyword(String q) {
         if (q == null || q.isBlank()) {
             throw new IllegalArgumentException("关键词不能为空");
         }
+        String keyword = q.trim();
+        int max = props.getMaxQueryLength();
+        if (keyword.length() > max) {
+            throw new IllegalArgumentException("关键词过长，最多 " + max + " 个字符");
+        }
+        char first = keyword.charAt(0);
+        if (first == '*' || first == '?') {
+            throw new IllegalArgumentException("关键词不能以 * 或 ? 开头");
+        }
+        return keyword;
     }
 
-    /** text + keyword 子字段：全文用 multi_match，中文包含用 wildcard */
-    private static Map<String, Object> textFieldsMapping(String... fields) {
+    private static Map<String, Object> noteIndexMapping() {
         Map<String, Object> properties = new LinkedHashMap<>();
-        // id / userId 用 long，精确过滤时有用
         properties.put("id", Map.of("type", "long"));
         properties.put("userId", Map.of("type", "long"));
-        Map<String, Object> keywordSub = Map.of("type", "keyword", "ignore_above", 256);
-        Map<String, Object> textWithKeyword = Map.of(
-                "type", "text",
-                "fields", Map.of("keyword", keywordSub)
-        );
-        for (String f : fields) {
-            properties.put(f, textWithKeyword);
-        }
+        properties.put("title", ikTextField());
+        properties.put("content", ikTextField());
+        properties.put("coverUrl", Map.of("type", "keyword", "ignore_above", 512));
         return Map.of("properties", properties);
+    }
+
+    private static Map<String, Object> userIndexMapping() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("id", Map.of("type", "long"));
+        properties.put("username", ikTextField());
+        properties.put("nickname", ikTextField());
+        properties.put("avatarUrl", Map.of("type", "keyword", "ignore_above", 512));
+        return Map.of("properties", properties);
+    }
+
+    /** text + IK：入库细切，查询智能切；keyword 子字段仅精确匹配用，不走 wildcard */
+    private static Map<String, Object> ikTextField() {
+        return Map.of(
+                "type", "text",
+                "analyzer", "ik_max_word",
+                "search_analyzer", "ik_smart",
+                "fields", Map.of("keyword", Map.of("type", "keyword", "ignore_above", 256))
+        );
     }
 }

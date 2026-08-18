@@ -1,5 +1,6 @@
 package contentservice.service;
 
+import contentservice.cache.NoteCache;
 import contentservice.dto.CreateNoteRequest;
 import contentservice.dto.NoteDetailResponse;
 import contentservice.dto.UpdateNoteRequest;
@@ -28,16 +29,19 @@ public class NoteService {
     private final NoteMediaMapper noteMediaMapper;
     private final OutboxService outboxService;
     private final OutboxRelay outboxRelay;
+    private final NoteCache noteCache;
 
     public NoteService(
             NoteMapper noteMapper,
             NoteMediaMapper noteMediaMapper,
             OutboxService outboxService,
-            OutboxRelay outboxRelay) {
+            OutboxRelay outboxRelay,
+            NoteCache noteCache) {
         this.noteMapper = noteMapper;
         this.noteMediaMapper = noteMediaMapper;
         this.outboxService = outboxService;
         this.outboxRelay = outboxRelay;
+        this.noteCache = noteCache;
     }
 
     /**
@@ -70,19 +74,27 @@ public class NoteService {
                 n.getId(),
                 NoteIndexEvent.from(n.getId(), n.getUserId(), n.getTitle(), n.getContent(), n.getCoverUrl()));
 
-        return toDetail(n.getId());
+        return toDetail(n);
     }
 
     public Note findById(Long id) {
-        return noteMapper.findById(id);
+        Note cached = noteCache.get(id);
+        if (cached != null) {
+            return cached;
+        }
+        Note n = noteMapper.findById(id);
+        if (n != null) {
+            noteCache.put(n);
+        }
+        return n;
     }
 
     public NoteDetailResponse findDetail(Long id) {
-        Note n = noteMapper.findById(id);
+        Note n = findById(id);
         if (n == null) {
             return null;
         }
-        return toDetail(id);
+        return toDetail(n);
     }
 
     public List<Note> listByUser(Long userId, int page, int size) {
@@ -122,11 +134,19 @@ public class NoteService {
         if (ordered.isEmpty()) {
             return List.of();
         }
-        List<Note> found = noteMapper.listByIds(ordered);
-        if (found == null || found.isEmpty()) {
-            return List.of();
+        var byId = noteCache.getMany(ordered);
+        List<Long> miss = ordered.stream().filter(id -> !byId.containsKey(id)).toList();
+        if (!miss.isEmpty()) {
+            List<Note> found = noteMapper.listByIds(miss);
+            if (found != null && !found.isEmpty()) {
+                noteCache.putMany(found);
+                for (Note n : found) {
+                    if (n.getId() != null) {
+                        byId.put(n.getId(), n);
+                    }
+                }
+            }
         }
-        var byId = found.stream().collect(java.util.stream.Collectors.toMap(Note::getId, n -> n, (a, b) -> a));
         List<Note> out = new ArrayList<>();
         for (Long id : ordered) {
             Note n = byId.get(id);
@@ -150,6 +170,7 @@ public class NoteService {
             n.setCoverUrl(req.getCoverUrl());
         }
         noteMapper.update(n);
+        noteCache.evict(noteId);
         Note updated = noteMapper.findById(noteId);
 
         enqueueAndKick(
@@ -167,6 +188,7 @@ public class NoteService {
         requireOwned(userId, noteId);
         noteMediaMapper.deleteByNoteId(noteId);
         noteMapper.delete(noteId);
+        noteCache.evict(noteId);
 
         enqueueAndKick(MqConstants.RK_NOTE_DELETED, noteId, NoteIndexEvent.deleted(noteId, userId));
     }
@@ -188,10 +210,10 @@ public class NoteService {
         }
     }
 
-    private NoteDetailResponse toDetail(Long noteId) {
+    private NoteDetailResponse toDetail(Note note) {
         NoteDetailResponse r = new NoteDetailResponse();
-        r.setNote(noteMapper.findById(noteId));
-        List<String> urls = noteMediaMapper.listUrlsByNoteId(noteId);
+        r.setNote(note);
+        List<String> urls = noteMediaMapper.listUrlsByNoteId(note.getId());
         r.setMediaUrls(urls != null ? urls : List.of());
         return r;
     }

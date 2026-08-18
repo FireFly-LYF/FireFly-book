@@ -38,3 +38,6 @@ firefly:
     base-url: ${ES_BASE_URL:http://127.0.0.1:9200}
     note-index: notes
     user-index: users
+    # 关键词长度上限；换 IK mapping 时一次性设 recreate-indices=true 删索引重建
+    max-query-length: ${ES_MAX_QUERY_LENGTH:64}
+    recreate-indices: ${ES_RECREATE_INDICES:false}

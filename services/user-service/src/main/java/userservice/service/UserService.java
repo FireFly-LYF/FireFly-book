@@ -1,5 +1,6 @@
 package userservice.service;
 
+import userservice.cache.UserProfileCache;
 import userservice.entity.User;
 import userservice.mapper.UserMapper;
 import userservice.mq.UserIndexEvent;
@@ -15,11 +16,16 @@ public class UserService {
 
     private final UserMapper userMapper;
     private final UserIndexEventPublisher userIndexEventPublisher;
+    private final UserProfileCache userProfileCache;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public UserService(UserMapper userMapper, UserIndexEventPublisher userIndexEventPublisher) {
+    public UserService(
+            UserMapper userMapper,
+            UserIndexEventPublisher userIndexEventPublisher,
+            UserProfileCache userProfileCache) {
         this.userMapper = userMapper;
         this.userIndexEventPublisher = userIndexEventPublisher;
+        this.userProfileCache = userProfileCache;
     }
 
     public User register(String username, String password, String nickname) {
@@ -62,9 +68,14 @@ public class UserService {
     }
 
     public User findById(Long id) {
+        User cached = userProfileCache.get(id);
+        if (cached != null) {
+            return cached;
+        }
         User u = userMapper.findById(id);
         if (u != null) {
             u.setPassword(null);
+            userProfileCache.put(u);
         }
         return u;
     }
@@ -85,6 +96,7 @@ public class UserService {
             u.setBio(bio);
         }
         userMapper.updateProfile(u);
+        userProfileCache.evict(userId);
 
         // 昵称/头像变更后覆盖写 ES
         userIndexEventPublisher.publishUpserted(

@@ -47,6 +47,9 @@ credentials.json
 *.p12
 *.jks
 
+# ----- 本地下载的 ES 插件包（勿提交大 zip） -----
+deploy/elasticsearch-plugins/*.zip
+
 # ----- 日志与临时文件 -----
 *.log
 logs/

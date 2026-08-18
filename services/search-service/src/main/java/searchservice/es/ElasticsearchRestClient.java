@@ -58,6 +58,21 @@ public class ElasticsearchRestClient {
         log.info("已创建 ES 索引 {}", index);
     }
 
+    /** 删除整个索引；不存在也不抛错（用于换 mapping / 重建） */
+    public void deleteIndex(String index) {
+        String url = props.getBaseUrl() + "/" + index;
+        try {
+            restTemplate.exchange(url, HttpMethod.DELETE, HttpEntity.EMPTY, String.class);
+            log.info("已删除 ES 索引 {}", index);
+        } catch (HttpClientErrorException.NotFound e) {
+            log.debug("删除索引时不存在 index={}", index);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() != HttpStatus.NOT_FOUND) {
+                throw e;
+            }
+        }
+    }
+
     /** 写入/覆盖文档：PUT /{index}/_doc/{id} */
     public void indexDoc(String index, String id, Object document) {
         String url = props.getBaseUrl() + "/" + index + "/_doc/" + id;
@@ -79,8 +94,8 @@ public class ElasticsearchRestClient {
     }
 
     /**
-     * multi_match 检索，返回 _source 反序列化后的列表。
-     * 无 IK 分词时中文效果一般；本地演示够用，生产可换 IK。
+     * multi_match 检索（走倒排；依赖索引 IK 分词）。
+     * 不做 wildcard / 前导通配，避免大数据量下慢查询。
      */
     public <T> List<T> search(String index, List<String> fields, String q, int from, int size, Class<T> type) {
         Map<String, Object> multiMatch = new LinkedHashMap<>();
@@ -88,19 +103,10 @@ public class ElasticsearchRestClient {
         multiMatch.put("fields", fields);
         multiMatch.put("type", "best_fields");
 
-        // 同时用 wildcard 兜底中文「包含」匹配（字段需能被通配；见 mapping 里的 keyword 子字段）
-        List<Map<String, Object>> should = new ArrayList<>();
-        should.add(Map.of("multi_match", multiMatch));
-        String wildcard = "*" + escapeWildcard(q) + "*";
-        for (String field : fields) {
-            should.add(Map.of("wildcard", Map.of(field + ".keyword", Map.of("value", wildcard, "case_insensitive", true))));
-        }
-
-        Map<String, Object> bool = Map.of("should", should, "minimum_should_match", 1);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("from", from);
         body.put("size", size);
-        body.put("query", Map.of("bool", bool));
+        body.put("query", Map.of("multi_match", multiMatch));
 
         String url = props.getBaseUrl() + "/" + index + "/_search";
         ResponseEntity<String> resp = restTemplate.exchange(
@@ -129,10 +135,5 @@ public class ElasticsearchRestClient {
             throw new IllegalStateException("解析 ES 搜索结果失败: " + e.getMessage(), e);
         }
         return list;
-    }
-
-    private static String escapeWildcard(String q) {
-        // 避免用户输入 * ? \ 把通配语义搞乱
-        return q.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?");
     }
 }

@@ -3,6 +3,10 @@ spring:
     listener:
       simple:
         auto-startup: false
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/user?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root

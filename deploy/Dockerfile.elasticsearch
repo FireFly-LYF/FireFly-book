@@ -1,0 +1,14 @@
+# Elasticsearch 8.15.3 + IK 中文分词（版本须与基座镜像一致）
+#
+# 构建前请先在宿主机下载插件包（Docker 构建阶段在线装 IK 常遇官方源 502）：
+#   PowerShell（仓库根目录）:
+#     New-Item -ItemType Directory -Force deploy/elasticsearch-plugins | Out-Null
+#     Invoke-WebRequest -Uri "https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-8.15.3.zip" `
+#       -OutFile "deploy/elasticsearch-plugins/elasticsearch-analysis-ik-8.15.3.zip" -UseBasicParsing
+#
+FROM docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+
+COPY deploy/elasticsearch-plugins/elasticsearch-analysis-ik-8.15.3.zip /tmp/elasticsearch-analysis-ik.zip
+
+# ES 官方镜像对 /tmp 有权限限制，装完后不要 rm（zip 留在镜像里无妨）
+RUN elasticsearch-plugin install --batch file:///tmp/elasticsearch-analysis-ik.zip

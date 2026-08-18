@@ -16,13 +16,25 @@ ES 适合全文检索；MySQL 继续做「权威数据源」，ES 做「搜索�
 
 ---
 
-## 步骤 1：本地起 ES（Docker）
+## 步骤 1：本地起 ES（Docker + IK）
+
+搜索依赖 **IK 中文分词**（`multi_match` 走倒排，不再用 `*q*` wildcard）。
+
+官方源在 Docker 构建里在线装插件常会 **502**，所以先在宿主机下载 zip，再构建镜像：
 
 ```powershell
-docker run -d --name es -p 9200:9200 -e "discovery.type=single-node" -e "xpack.security.enabled=false" elasticsearch:8.12.0
+# 在仓库根目录 FireFly-book 执行
+New-Item -ItemType Directory -Force deploy/elasticsearch-plugins | Out-Null
+Invoke-WebRequest -Uri "https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-8.15.3.zip" `
+  -OutFile "deploy/elasticsearch-plugins/elasticsearch-analysis-ik-8.15.3.zip" -UseBasicParsing
+
+docker compose -f deploy/docker-compose.yml --env-file .env up -d elasticsearch --build
 ```
 
-浏览器打开 http://127.0.0.1:9200 有 JSON 即成功。
+若还没有 `.env`：先 `copy .env.example .env` 并填密钥；只起 ES 时那些密钥告警可先忽略，但带 `--env-file .env` 更干净。
+
+浏览器打开 http://127.0.0.1:9200 有 JSON 即成功。  
+若本地已有旧 `notes`/`users` 索引（无 IK），启动 search-service 前设一次 `ES_RECREATE_INDICES=true` 删索引重建，再改回 `false`；文档靠发帖/用户事件经 MQ 回填。
 
 ---
 

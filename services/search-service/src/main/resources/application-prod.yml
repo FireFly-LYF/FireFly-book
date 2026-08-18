@@ -8,3 +8,6 @@ spring:
 firefly:
   elasticsearch:
     base-url: ${ES_BASE_URL:http://elasticsearch:9200}
+    max-query-length: ${ES_MAX_QUERY_LENGTH:64}
+    # 升级 IK 后可临时 true 重建索引，回填靠 MQ；勿长期开启
+    recreate-indices: ${ES_RECREATE_INDICES:false}

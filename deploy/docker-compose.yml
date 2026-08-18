@@ -27,6 +27,8 @@ x-java-env: &java-env
   USER_BASE_URL: http://user-service:9001
   CONTENT_BASE_URL: http://content-service:9002
   ES_BASE_URL: http://elasticsearch:9200
+  # 换 IK mapping 后一次性设 true 重建 notes/users，再改回 false
+  ES_RECREATE_INDICES: ${ES_RECREATE_INDICES:-false}
   SERVER_ADDRESS: "0.0.0.0"
 
 x-java-build: &java-build
@@ -74,7 +76,9 @@ services:
       retries: 20
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.elasticsearch
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
@@ -99,6 +103,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   content-service:
@@ -112,6 +118,8 @@ services:
       mysql:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
