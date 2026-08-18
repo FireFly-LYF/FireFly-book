@@ -103,13 +103,52 @@ public class NoteCache {
             return;
         }
         try {
-            redis.delete(key(id));
+            redis.delete(List.of(key(id), mediaKey(id)));
         } catch (Exception e) {
             log.warn("删笔记缓存失败 id={}: {}", id, e.getMessage());
         }
     }
 
+    /** 未命中返回 null（与空列表 [] 区分）。 */
+    public List<String> getMedia(Long noteId) {
+        if (noteId == null) {
+            return null;
+        }
+        try {
+            String json = redis.opsForValue().get(mediaKey(noteId));
+            if (json == null) {
+                return null;
+            }
+            if (json.isBlank()) {
+                return List.of();
+            }
+            String[] urls = jsonMapper.readValue(json, String[].class);
+            return urls == null || urls.length == 0 ? List.of() : List.of(urls);
+        } catch (Exception e) {
+            log.warn("读笔记媒体缓存失败 id={}: {}", noteId, e.getMessage());
+            return null;
+        }
+    }
+
+    public void putMedia(Long noteId, List<String> urls) {
+        if (noteId == null) {
+            return;
+        }
+        try {
+            redis.opsForValue().set(
+                    mediaKey(noteId),
+                    jsonMapper.writeValueAsString(urls != null ? urls : List.of()),
+                    TTL);
+        } catch (Exception e) {
+            log.warn("写笔记媒体缓存失败 id={}: {}", noteId, e.getMessage());
+        }
+    }
+
     private static String key(Long id) {
         return KEY_PREFIX + id;
+    }
+
+    private static String mediaKey(Long id) {
+        return "note:media:" + id;
     }
 }

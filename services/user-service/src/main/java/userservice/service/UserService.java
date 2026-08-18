@@ -82,7 +82,7 @@ public class UserService {
 
     /** 只覆盖非空字段，不改 username */
     public User updateProfile(Long userId, String nickname, String avatarUrl, String bio) {
-        User u = userMapper.findById(userId);
+        User u = findById(userId);
         if (u == null) {
             throw new IllegalArgumentException("用户不存在");
         }

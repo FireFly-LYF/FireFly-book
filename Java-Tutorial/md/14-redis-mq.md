@@ -65,15 +65,22 @@ SET NX + TTL 或直接用 Set：note:liked:users:{noteId}
 取消：`DELETE` 成功后 `DECR`。  
 `GET /api/social/like/{noteId}/count` 优先读 Redis，未命中再查库并回写（TTL 24h）。
 
-**用户资料 / 笔记（已在 user-service、content-service 落地）：**
+**用户资料 / 笔记 / 列表（已落地）：**
 
 ```text
-Key: user:info:{id}     TTL 10 分钟
-Key: note:info:{id}     TTL 10 分钟
+Key: user:info:{id}                          TTL 10 分钟
+Key: note:info:{id} / note:media:{id}        TTL 10 分钟
+Key: note:list:{userId}:wall:{page}:{size}
+Key: note:list:{userId}:latest:{perUser}
+Key: follow:followingIds:{id} / follow:followerIds:{id}
+Key: note:comments:{noteId}
+Key: user:liked:{id}:{page}:{size}
+Key: user:collected:{id}:{page}:{size}
+Key: notify:inbox:{userId}:{page}:{size}
 ```
 
-`GET /api/user/{id}`、`GET /api/user/me`：先 Redis，未命中查库并回写（不缓存密码）。改资料后删 key。  
-`GET /api/note/{id}`、Feed 批量 `/api/note/ids`：同样先缓存；更新/删除笔记后删 key。Redis 挂了则直接打 MySQL。
+读：先 Redis → 未命中查库并回写。写：更新 MySQL 后 **删缓存**（列表按用户/笔记前缀整段失效）。  
+`requireOwned` / `requireUser` 走详情缓存，不再直打 mapper。Redis 挂了则直接打 MySQL。
 
 ---
 

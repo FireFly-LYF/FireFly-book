@@ -1,5 +1,6 @@
 package socialservice.service;
 
+import socialservice.cache.CommentCache;
 import socialservice.client.NoteAuthorClient;
 import socialservice.dto.CreateCommentRequest;
 import socialservice.entity.Comment;
@@ -21,14 +22,17 @@ public class CommentService {
     private final CommentMapper commentMapper;
     private final NoteAuthorClient noteAuthorClient;
     private final NotifyEventPublisher notifyEventPublisher;
+    private final CommentCache commentCache;
 
     public CommentService(
             CommentMapper commentMapper,
             NoteAuthorClient noteAuthorClient,
-            NotifyEventPublisher notifyEventPublisher) {
+            NotifyEventPublisher notifyEventPublisher,
+            CommentCache commentCache) {
         this.commentMapper = commentMapper;
         this.noteAuthorClient = noteAuthorClient;
         this.notifyEventPublisher = notifyEventPublisher;
+        this.commentCache = commentCache;
     }
 
     public Comment create(Long userId, CreateCommentRequest req) {
@@ -49,13 +53,23 @@ public class CommentService {
         comment.setParentId(req.getParentId());
         comment.setContent(content);
         commentMapper.insert(comment);
+        commentCache.evict(req.getNoteId());
         Comment saved = commentMapper.findById(comment.getId());
         publishCommentNotify(userId, saved);
         return saved;
     }
 
     public List<Comment> listByNoteId(Long noteId) {
-        return commentMapper.listByNoteId(noteId);
+        List<Comment> cached = commentCache.get(noteId);
+        if (cached != null) {
+            return cached;
+        }
+        List<Comment> list = commentMapper.listByNoteId(noteId);
+        if (list == null) {
+            list = List.of();
+        }
+        commentCache.put(noteId, list);
+        return list;
     }
 
     private void publishCommentNotify(Long fromUserId, Comment comment) {

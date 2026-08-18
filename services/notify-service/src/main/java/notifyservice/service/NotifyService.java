@@ -1,5 +1,6 @@
 package notifyservice.service;
 
+import notifyservice.cache.NotifyListCache;
 import notifyservice.dto.CreateNotifyRequest;
 import notifyservice.dto.ReadNotifyRequest;
 import notifyservice.entity.Notification;
@@ -15,9 +16,11 @@ public class NotifyService {
     private static final Set<String> ALLOWED_TYPES = Set.of("LIKE", "COMMENT", "FOLLOW");
 
     private final NotificationMapper notificationMapper;
+    private final NotifyListCache notifyListCache;
 
-    public NotifyService(NotificationMapper notificationMapper) {
+    public NotifyService(NotificationMapper notificationMapper, NotifyListCache notifyListCache) {
         this.notificationMapper = notificationMapper;
+        this.notifyListCache = notifyListCache;
     }
 
     public Notification create(CreateNotifyRequest req) {
@@ -46,6 +49,7 @@ public class NotifyService {
         n.setRefId(req.getRefId());
         n.setContent(content);
         notificationMapper.insert(n);
+        notifyListCache.evictUser(req.getUserId());
         return notificationMapper.findById(n.getId());
     }
 
@@ -53,21 +57,34 @@ public class NotifyService {
         if (page < 1) page = 1;
         if (size < 1) size = 20;
         if (size > 100) size = 100;
+        List<Notification> cached = notifyListCache.get(userId, page, size);
+        if (cached != null) {
+            return cached;
+        }
         int offset = (page - 1) * size;
-        return notificationMapper.listByUser(userId, size, offset);
+        List<Notification> list = notificationMapper.listByUser(userId, size, offset);
+        if (list == null) {
+            list = List.of();
+        }
+        notifyListCache.put(userId, page, size, list);
+        return list;
     }
 
     public int markRead(Long userId, ReadNotifyRequest req) {
         if (req == null) {
             throw new IllegalArgumentException("请求体不能为空");
         }
+        int updated;
         if (Boolean.TRUE.equals(req.getAll())) {
-            return notificationMapper.markAllRead(userId);
+            updated = notificationMapper.markAllRead(userId);
+        } else {
+            List<Long> ids = req.getIds();
+            if (ids == null || ids.isEmpty()) {
+                throw new IllegalArgumentException("请传 all=true 或 ids");
+            }
+            updated = notificationMapper.markReadByIds(userId, ids);
         }
-        List<Long> ids = req.getIds();
-        if (ids == null || ids.isEmpty()) {
-            throw new IllegalArgumentException("请传 all=true 或 ids");
-        }
-        return notificationMapper.markReadByIds(userId, ids);
+        notifyListCache.evictUser(userId);
+        return updated;
     }
 }

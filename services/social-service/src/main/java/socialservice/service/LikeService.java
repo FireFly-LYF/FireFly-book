@@ -1,5 +1,6 @@
 package socialservice.service;
 
+import socialservice.cache.UserNoteIdsCache;
 import socialservice.client.NoteAuthorClient;
 import socialservice.mapper.NoteLikeMapper;
 import socialservice.mq.MqConstants;
@@ -24,16 +25,19 @@ public class LikeService {
     private final NoteAuthorClient noteAuthorClient;
     private final NotifyEventPublisher notifyEventPublisher;
     private final StringRedisTemplate redis;
+    private final UserNoteIdsCache userNoteIdsCache;
 
     public LikeService(
             NoteLikeMapper noteLikeMapper,
             NoteAuthorClient noteAuthorClient,
             NotifyEventPublisher notifyEventPublisher,
-            StringRedisTemplate redis) {
+            StringRedisTemplate redis,
+            UserNoteIdsCache userNoteIdsCache) {
         this.noteLikeMapper = noteLikeMapper;
         this.noteAuthorClient = noteAuthorClient;
         this.notifyEventPublisher = notifyEventPublisher;
         this.redis = redis;
+        this.userNoteIdsCache = userNoteIdsCache;
     }
 
     public void like(Long userId, Long noteId) {
@@ -42,6 +46,7 @@ public class LikeService {
         }
         // 先写 DB，成功后再改 Redis
         noteLikeMapper.insert(noteId, userId);
+        userNoteIdsCache.evictLiked(userId);
         incrCount(noteId);
         publishLikeNotify(userId, noteId);
     }
@@ -50,6 +55,7 @@ public class LikeService {
         if (noteLikeMapper.delete(noteId, userId) == 0) {
             throw new IllegalArgumentException("尚未点赞");
         }
+        userNoteIdsCache.evictLiked(userId);
         decrCount(noteId);
     }
 
@@ -79,8 +85,17 @@ public class LikeService {
         if (page < 1) page = 1;
         if (size < 1) size = 20;
         if (size > 100) size = 100;
+        List<Long> cached = userNoteIdsCache.getLiked(userId, page, size);
+        if (cached != null) {
+            return cached;
+        }
         int offset = (page - 1) * size;
-        return noteLikeMapper.findNoteIdsByUser(userId, offset, size);
+        List<Long> ids = noteLikeMapper.findNoteIdsByUser(userId, offset, size);
+        if (ids == null) {
+            ids = List.of();
+        }
+        userNoteIdsCache.putLiked(userId, page, size, ids);
+        return ids;
     }
 
     private void incrCount(Long noteId) {
