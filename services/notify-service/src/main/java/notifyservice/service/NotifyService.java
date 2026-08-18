@@ -5,6 +5,7 @@ import notifyservice.dto.CreateNotifyRequest;
 import notifyservice.dto.ReadNotifyRequest;
 import notifyservice.entity.Notification;
 import notifyservice.mapper.NotificationMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -46,9 +47,15 @@ public class NotifyService {
         n.setUserId(req.getUserId());
         n.setFromUserId(req.getFromUserId());
         n.setType(type);
-        n.setRefId(req.getRefId());
+        n.setRefId(req.getRefId() == null ? 0L : req.getRefId());
         n.setContent(content);
-        notificationMapper.insert(n);
+        try {
+            notificationMapper.insert(n);
+        } catch (DuplicateKeyException e) {
+            Notification existing = notificationMapper.findByEvent(
+                    n.getUserId(), n.getType(), n.getFromUserId(), n.getRefId());
+            return existing != null ? existing : n;
+        }
         notifyListCache.evictUser(req.getUserId());
         return notificationMapper.findById(n.getId());
     }

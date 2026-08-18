@@ -13,6 +13,7 @@ import contentservice.mq.MqConstants;
 import contentservice.mq.NoteIndexEvent;
 import contentservice.mq.OutboxRelay;
 import contentservice.mq.OutboxService;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -54,16 +55,34 @@ public class NoteService {
     /**
      * 发笔记：事务内写 note + note_media + outbox；
      * 提交后再触发一次投递（失败由定时 OutboxRelay 继续重试）。
+     * 带 Idempotency-Key 时 (user_id, idem_key) 唯一，重试返回第一次的笔记。
      */
     @Transactional
-    public NoteDetailResponse create(Long userId, CreateNoteRequest req) {
+    public NoteDetailResponse create(Long userId, CreateNoteRequest req, String idempotencyKey) {
+        String idemKey = normalizeIdempotencyKey(idempotencyKey);
+        if (idemKey != null) {
+            Note existed = noteMapper.findByUserAndIdemKey(userId, idemKey);
+            if (existed != null) {
+                return toDetail(existed);
+            }
+        }
+
         Note n = new Note();
         n.setUserId(userId);
         n.setTitle(req.getTitle());
         n.setContent(req.getContent());
         n.setCoverUrl(req.getCoverUrl());
         n.setStatus(1);
-        noteMapper.insert(n);
+        n.setIdemKey(idemKey);
+        try {
+            noteMapper.insert(n);
+        } catch (DuplicateKeyException e) {
+            Note existed = noteMapper.findByUserAndIdemKey(userId, idemKey);
+            if (existed != null) {
+                return toDetail(existed);
+            }
+            throw e;
+        }
 
         List<String> urls = req.getMediaUrls();
         if (urls != null) {
@@ -290,5 +309,16 @@ public class NoteService {
             throw new SecurityException("无权操作");
         }
         return n;
+    }
+
+    static String normalizeIdempotencyKey(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String key = raw.trim();
+        if (key.length() > 64) {
+            throw new IllegalArgumentException("Idempotency-Key 最长 64 字符");
+        }
+        return key;
     }
 }

@@ -30,6 +30,13 @@ export function getDeviceFingerprint() {
   return id
 }
 
+/** 一次点击一张号码牌；超时重试必须复用，成功后再换新的。 */
+export function newIdempotencyKey() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `idem-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+}
+
 function withDevice(data = {}) {
   return { ...data, deviceFingerprint: getDeviceFingerprint() }
 }
@@ -216,10 +223,13 @@ export function mediaApi() {
 
 export function noteApi() {
   return {
-    create: (data) =>
+    create: (data, idempotencyKey) =>
       request('/api/note', {
         method: 'POST',
-        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        headers: authHeaders({
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey || newIdempotencyKey(),
+        }),
         body: JSON.stringify(data),
       }),
     detail: (id) =>
@@ -280,10 +290,13 @@ export function socialApi() {
       request(`/api/social/collect/of/${userId}?page=${page}&size=${size}`, {
         headers: authHeaders(),
       }),
-    comment: (data) =>
+    comment: (data, idempotencyKey) =>
       request('/api/social/comment', {
         method: 'POST',
-        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        headers: authHeaders({
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey || newIdempotencyKey(),
+        }),
         body: JSON.stringify(data),
       }),
     comments: (noteId) =>

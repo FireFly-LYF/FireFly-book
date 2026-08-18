@@ -8,7 +8,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 /**
- * 业务非法（IllegalArgumentException）ACK 丢弃；其它失败抛出 → retry → DLQ。
+ * 业务非法（IllegalArgumentException）ACK 丢弃；uk 冲突在 Service 内当已存在并返回（ACK）；
+ * 其它失败抛出 → retry → DLQ。
  */
 @Component
 public class NotifyEventListener {

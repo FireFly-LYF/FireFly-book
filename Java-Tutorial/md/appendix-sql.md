@@ -53,10 +53,12 @@ CREATE TABLE IF NOT EXISTS `note` (
   `cover_url`   VARCHAR(512) DEFAULT NULL,
   `status`      TINYINT      NOT NULL DEFAULT 1,
   `like_count`  INT          NOT NULL DEFAULT 0,
+  `idem_key`    VARCHAR(64)  DEFAULT NULL COMMENT '客户端 Idempotency-Key',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_user (`user_id`),
-  KEY idx_created (`created_at`)
+  KEY idx_created (`created_at`),
+  UNIQUE KEY uk_note_idem (`user_id`, `idem_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `note_media` (
@@ -126,8 +128,10 @@ CREATE TABLE IF NOT EXISTS `comment` (
   `user_id`    BIGINT NOT NULL,
   `parent_id`  BIGINT DEFAULT NULL,
   `content`    VARCHAR(512) NOT NULL,
+  `idem_key`   VARCHAR(64) DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_note (`note_id`)
+  KEY idx_note (`note_id`),
+  UNIQUE KEY uk_comment_idem (`user_id`, `idem_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ========== notify ==========
@@ -139,10 +143,11 @@ CREATE TABLE IF NOT EXISTS `notification` (
   `user_id`      BIGINT       NOT NULL,
   `from_user_id` BIGINT       NOT NULL,
   `type`         VARCHAR(32)  NOT NULL,
-  `ref_id`       BIGINT       DEFAULT NULL,
+  `ref_id`       BIGINT       NOT NULL DEFAULT 0,
   `content`      VARCHAR(256) DEFAULT NULL,
   `is_read`      TINYINT      NOT NULL DEFAULT 0,
   `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_notify_event (`user_id`, `type`, `from_user_id`, `ref_id`),
   KEY idx_user_time (`user_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```

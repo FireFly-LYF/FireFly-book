@@ -21,12 +21,13 @@ public class CommentController {
     @PostMapping
     public ApiResponse<Comment> create(
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody CreateCommentRequest req) {
         if (userId == null) {
             return ApiResponse.fail(40100, "未登录");
         }
         try {
-            return ApiResponse.ok(commentService.create(userId, req));
+            return ApiResponse.ok(commentService.create(userId, req, idempotencyKey));
         } catch (IllegalArgumentException e) {
             return ApiResponse.fail(40001, e.getMessage());
         }

@@ -33,10 +33,12 @@ CREATE TABLE IF NOT EXISTS `note` (
   `cover_url`   VARCHAR(512) DEFAULT NULL,
   `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '0草稿 1已发布 2审核中 3拒绝',
   `like_count`  INT          NOT NULL DEFAULT 0,
+  `idem_key`    VARCHAR(64)  DEFAULT NULL COMMENT '客户端 Idempotency-Key',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_user (`user_id`),
-  KEY idx_created (`created_at`)
+  KEY idx_created (`created_at`),
+  UNIQUE KEY uk_note_idem (`user_id`, `idem_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 笔记关联的图片（media-service 返回的 url 或 id）
@@ -81,7 +83,7 @@ CREATE TABLE IF NOT EXISTS `note_media` (
 }
 ```
 
-作者从 Header 取：`X-User-Id`。
+作者从 Header 取：`X-User-Id`。发帖可再带 `Idempotency-Key`（UUID）：同一用户同一钥匙只成功一次，超时重试不会插出两篇。
 
 ---
 

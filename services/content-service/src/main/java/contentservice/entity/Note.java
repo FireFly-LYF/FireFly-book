@@ -10,6 +10,7 @@ public class Note {
     private String coverUrl;
     private Integer status;
     private Integer likeCount;
+    private String idemKey;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -55,6 +56,12 @@ public class Note {
     }
     public void setLikeCount(Integer likeCount) {
         this.likeCount = likeCount;
+    }
+    public String getIdemKey() {
+        return idemKey;
+    }
+    public void setIdemKey(String idemKey) {
+        this.idemKey = idemKey;
     }
     public LocalDateTime getCreatedAt() {
         return createdAt;

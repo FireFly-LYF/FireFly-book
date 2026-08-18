@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { noteApi, socialApi, toLocalMediaUrl, userApi } from '../api'
+import { noteApi, socialApi, toLocalMediaUrl, userApi, newIdempotencyKey } from '../api'
 import UserAvatar from './UserAvatar.vue'
 import SignedImg from './SignedImg.vue'
 
@@ -18,6 +18,7 @@ const liked = ref(false)
 const collected = ref(false)
 const comments = ref([])
 const commentText = ref('')
+const commentIdemKey = ref(null)
 const loading = ref(false)
 const nicknames = ref({})
 
@@ -132,12 +133,14 @@ async function sendComment() {
   if (!props.loggedIn) return emit('need-login')
   const text = commentText.value.trim()
   if (!text) return
+  if (!commentIdemKey.value) commentIdemKey.value = newIdempotencyKey()
   const res = await socialApi().comment({
     noteId: Number(props.noteId),
     content: text,
     parentId: null,
-  })
+  }, commentIdemKey.value)
   if (res.body?.code === 0) {
+    commentIdemKey.value = null
     commentText.value = ''
     await refreshSocial(props.noteId)
   } else emit('toast', res.body?.message || '评论失败')

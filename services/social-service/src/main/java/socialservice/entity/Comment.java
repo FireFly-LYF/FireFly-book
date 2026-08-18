@@ -8,6 +8,7 @@ public class Comment {
     private Long userId;
     private Long parentId;
     private String content;
+    private String idemKey;
     private LocalDateTime createdAt;
 
     public Long getId() { return id; }
@@ -20,6 +21,8 @@ public class Comment {
     public void setParentId(Long parentId) { this.parentId = parentId; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
+    public String getIdemKey() { return idemKey; }
+    public void setIdemKey(String idemKey) { this.idemKey = idemKey; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

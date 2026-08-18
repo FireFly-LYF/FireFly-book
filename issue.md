@@ -58,10 +58,10 @@
 
 | ID | 状态 | 风险 | 证据位置 | 上线后果 | 建议方向 |
 |----|------|------|----------|----------|----------|
-| C1 | 未改 | 笔记 update 未与 create 对齐事务 + afterCommit | `NoteService.update` | 更新失败仍可能已发 MQ，或边界不清 | 与 create 对齐 `@Transactional` + afterCommit |
-| C2 | 未改 | 点赞「先查后插」竞态 | `LikeService.like`；表有 `uk_like` | 并发双击可能 500 而非业务友好错误 | 捕获 DuplicateKey / INSERT IGNORE |
-| C3 | 未改 | 通知表无幂等键 | `NotifyService.create` 每次 insert | MQ 重投产生重复 LIKE/FOLLOW 通知 | `(type, from_user_id, ref_id)` 唯一或消费去重 |
-| C4 | 未改 | 关键写操作无 `Idempotency-Key` | 发帖/评论等 | 客户端重试导致重复内容 | 幂等表或唯一业务键 |
+| C1 | **已修复** | 笔记 update 未与 create 对齐事务 + afterCommit | `NoteService.update` + `enqueueAndKick` | 与 create 同事务写 outbox，提交后 afterCommit 再 Relay；失败回滚不会发 MQ | 无 |
+| C2 | **已修复** | 点赞「先查后插」竞态 | `LikeService.like`；`CollectService.collect` | 直接 INSERT；`uk_like`/`uk_collect` 冲突 → 业务错误（已点过赞/已收藏），不再 500 | 无 |
+| C3 | **已修复** | 通知表无幂等键 | `notification.uk_notify_event`；`NotifyService.create` | MQ 重投撞唯一键视为已存在并 ACK，不再插重复 LIKE/FOLLOW/COMMENT | 已有库需补 UNIQUE（见 `schema.sql` 注释） |
+| C4 | **已修复** | 关键写操作无 `Idempotency-Key` | 发帖/评论 `idem_key` + 请求头 | 同一用户同一钥匙重试返回首次结果，不再插重复内容 | 已有库执行 `note_idem_key.sql` / `comment_idem_key.sql` |
 
 ---
 
@@ -112,6 +112,10 @@
 | **M1** | Search/Notify 消费失败上抛，不再吞异常 ACK |
 | **M2** | 业务队列 DLX + DLQ；listener 重试 3 次退避 |
 | **M3** | content 笔记 Transactional Outbox（事务内入箱 + Relay 投递） |
+| **C1** | `NoteService.update`/`delete` 与 create 对齐：`@Transactional` 内写 outbox，`afterCommit` 再 Relay |
+| **C2** | 点赞/收藏直接 INSERT，唯一键冲突转成「已点过赞/已收藏」，不再先查后插 |
+| **C3** | `notification` 加 `uk_notify_event`；INSERT 冲突当已通知，MQ 正常 ACK |
+| **C4** | 发帖/评论 `Idempotency-Key` + `(user_id, idem_key)` 唯一；撞键返回首次结果 |
 | **D1** | 主机/库/MQ/媒体路径改 `${ENV:默认}`；媒体默认 `${user.home}/FireFlyData/media`，compose 挂 `/data/media` |
 | **D2** | 各服务 `application-prod.yml`；`deploy/docker-compose.yml` 编排 Java+infra+Gateway（`gateway-compose.yaml`） |
 | **R1** | Feed 写扩散：`feed_inbox`(MySQL)+Redis ZSet；消费 note/follow 事件；读路径缓存→inbox→批量水合，空则读扩散回退 |

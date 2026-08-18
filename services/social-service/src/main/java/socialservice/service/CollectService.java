@@ -2,6 +2,7 @@ package socialservice.service;
 
 import socialservice.cache.UserNoteIdsCache;
 import socialservice.mapper.NoteCollectMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,10 +19,11 @@ public class CollectService {
     }
 
     public void collect(Long userId, Long noteId) {
-        if (noteCollectMapper.exists(noteId, userId) > 0) {
+        try {
+            noteCollectMapper.insert(noteId, userId);
+        } catch (DuplicateKeyException e) {
             throw new IllegalArgumentException("已收藏");
         }
-        noteCollectMapper.insert(noteId, userId);
         userNoteIdsCache.evictCollected(userId);
     }
 

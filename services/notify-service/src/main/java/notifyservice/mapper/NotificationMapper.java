@@ -13,6 +13,14 @@ public interface NotificationMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Notification notification);
 
+    @Select("SELECT * FROM notification WHERE user_id=#{userId} AND type=#{type} " +
+            "AND from_user_id=#{fromUserId} AND ref_id=#{refId} LIMIT 1")
+    Notification findByEvent(
+            @Param("userId") Long userId,
+            @Param("type") String type,
+            @Param("fromUserId") Long fromUserId,
+            @Param("refId") Long refId);
+
     @Select("SELECT * FROM notification WHERE id=#{id}")
     Notification findById(Long id);
 

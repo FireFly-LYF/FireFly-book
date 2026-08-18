@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { mediaApi, noteApi, toLocalMediaUrl } from '../api'
+import { mediaApi, noteApi, toLocalMediaUrl, newIdempotencyKey } from '../api'
 import SignedImg from '../components/SignedImg.vue'
 
 const props = defineProps({ loggedIn: Boolean })
@@ -9,6 +9,7 @@ const emit = defineEmits(['need-login', 'toast', 'published'])
 const form = ref({ title: '', content: '', coverUrl: '', accessUrl: '' })
 const uploading = ref(false)
 const publishing = ref(false)
+const publishIdemKey = ref(null)
 
 async function onPick(e) {
   if (!props.loggedIn) return emit('need-login')
@@ -38,16 +39,18 @@ async function publish() {
     return emit('toast', '写点标题或正文吧')
   }
   publishing.value = true
+  if (!publishIdemKey.value) publishIdemKey.value = newIdempotencyKey()
   try {
     const res = await noteApi().create({
       title: form.value.title || '无标题',
       content: form.value.content,
       coverUrl: form.value.coverUrl || null,
-    })
+    }, publishIdemKey.value)
     if (res.body?.code !== 0) {
       emit('toast', res.body?.message || '发布失败')
       return
     }
+    publishIdemKey.value = null
     form.value = { title: '', content: '', coverUrl: '', accessUrl: '' }
     emit('toast', '发布成功')
     emit('published', res.body.data)

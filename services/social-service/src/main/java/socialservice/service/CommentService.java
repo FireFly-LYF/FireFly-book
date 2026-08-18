@@ -10,6 +10,7 @@ import socialservice.mq.NotifyEvent;
 import socialservice.mq.NotifyEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -35,7 +36,7 @@ public class CommentService {
         this.commentCache = commentCache;
     }
 
-    public Comment create(Long userId, CreateCommentRequest req) {
+    public Comment create(Long userId, CreateCommentRequest req, String idempotencyKey) {
         if (req.getNoteId() == null) {
             throw new IllegalArgumentException("noteId 不能为空");
         }
@@ -46,13 +47,29 @@ public class CommentService {
         if (content.length() > 512) {
             throw new IllegalArgumentException("评论内容不能超过 512 字");
         }
+        String idemKey = normalizeIdempotencyKey(idempotencyKey);
+        if (idemKey != null) {
+            Comment existed = commentMapper.findByUserAndIdemKey(userId, idemKey);
+            if (existed != null) {
+                return existed;
+            }
+        }
 
         Comment comment = new Comment();
         comment.setNoteId(req.getNoteId());
         comment.setUserId(userId);
         comment.setParentId(req.getParentId());
         comment.setContent(content);
-        commentMapper.insert(comment);
+        comment.setIdemKey(idemKey);
+        try {
+            commentMapper.insert(comment);
+        } catch (DuplicateKeyException e) {
+            Comment existed = commentMapper.findByUserAndIdemKey(userId, idemKey);
+            if (existed != null) {
+                return existed;
+            }
+            throw e;
+        }
         commentCache.evict(req.getNoteId());
         Comment saved = commentMapper.findById(comment.getId());
         publishCommentNotify(userId, saved);
@@ -88,5 +105,16 @@ public class CommentService {
         NotifyEvent event = new NotifyEvent(
                 authorId, fromUserId, "COMMENT", comment.getId(), "评论了你的笔记: " + preview);
         notifyEventPublisher.publish(MqConstants.RK_COMMENT_CREATED, event);
+    }
+
+    static String normalizeIdempotencyKey(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String key = raw.trim();
+        if (key.length() > 64) {
+            throw new IllegalArgumentException("Idempotency-Key 最长 64 字符");
+        }
+        return key;
     }
 }

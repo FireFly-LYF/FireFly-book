@@ -23,14 +23,15 @@ CREATE DATABASE IF NOT EXISTS notify DEFAULT CHARACTER SET utf8mb4;
 USE notify;
 
 CREATE TABLE IF NOT EXISTS `notification` (
-  `id`          BIGINT PRIMARY KEY AUTO_INCREMENT,
-  `user_id`     BIGINT       NOT NULL COMMENT '接收者',
-  `from_user_id` BIGINT      NOT NULL COMMENT '触发者',
-  `type`        VARCHAR(32)  NOT NULL COMMENT 'LIKE/COMMENT/FOLLOW',
-  `ref_id`      BIGINT       DEFAULT NULL COMMENT '笔记或评论 id',
-  `content`     VARCHAR(256) DEFAULT NULL,
-  `is_read`     TINYINT      NOT NULL DEFAULT 0,
-  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `id`           BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `user_id`      BIGINT       NOT NULL COMMENT '接收者',
+  `from_user_id` BIGINT       NOT NULL COMMENT '触发者',
+  `type`         VARCHAR(32)  NOT NULL COMMENT 'LIKE/COMMENT/FOLLOW',
+  `ref_id`       BIGINT       NOT NULL DEFAULT 0 COMMENT '笔记或评论 id；FOLLOW 用 0',
+  `content`      VARCHAR(256) DEFAULT NULL,
+  `is_read`      TINYINT      NOT NULL DEFAULT 0,
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_notify_event (`user_id`, `type`, `from_user_id`, `ref_id`),
   KEY idx_user_time (`user_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```

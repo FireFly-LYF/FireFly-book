@@ -46,12 +46,14 @@ CREATE TABLE IF NOT EXISTS `comment` (
   `user_id`    BIGINT NOT NULL,
   `parent_id`  BIGINT DEFAULT NULL COMMENT '回复哪条评论，可空',
   `content`    VARCHAR(512) NOT NULL,
+  `idem_key`   VARCHAR(64) DEFAULT NULL COMMENT '客户端 Idempotency-Key',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_note (`note_id`)
+  KEY idx_note (`note_id`),
+  UNIQUE KEY uk_comment_idem (`user_id`, `idem_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-`UNIQUE KEY` 保证同一用户对同一笔记只能赞一次。
+`UNIQUE KEY` 保证同一用户对同一笔记只能赞一次。评论/发帖用 `Idempotency-Key` 防客户端重试插出两条。
 
 ---
 
@@ -118,7 +120,7 @@ SELECT COUNT(1) FROM note_like WHERE note_id = #{noteId}
 
 按 `created_at ASC` 或 `id ASC` 返回；先不做楼中楼树形，扁平列表即可：有 `parentId` 前端自己拼。
 
-校验：`content` 不能空白，长度 ≤ 512。
+校验：`content` 不能空白，长度 ≤ 512。发评带 `Idempotency-Key`，撞 `uk_comment_idem` 则返回第一次那条。
 
 ---
 

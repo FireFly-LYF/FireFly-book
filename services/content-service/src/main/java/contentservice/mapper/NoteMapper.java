@@ -8,10 +8,13 @@ import java.util.List;
 @Mapper
 public interface NoteMapper {
 
-    @Insert("INSERT INTO note(user_id, title, content, cover_url, status) " +
-            "VALUES(#{userId}, #{title}, #{content}, #{coverUrl}, #{status})")
+    @Insert("INSERT INTO note(user_id, title, content, cover_url, status, idem_key) " +
+            "VALUES(#{userId}, #{title}, #{content}, #{coverUrl}, #{status}, #{idemKey})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Note note);
+
+    @Select("SELECT * FROM note WHERE user_id=#{userId} AND idem_key=#{idemKey} LIMIT 1")
+    Note findByUserAndIdemKey(@Param("userId") Long userId, @Param("idemKey") String idemKey);
 
     @Select("SELECT * FROM note WHERE id=#{id}")
     Note findById(Long id);

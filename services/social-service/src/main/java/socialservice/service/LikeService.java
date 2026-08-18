@@ -8,6 +8,7 @@ import socialservice.mq.NotifyEvent;
 import socialservice.mq.NotifyEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -41,11 +42,12 @@ public class LikeService {
     }
 
     public void like(Long userId, Long noteId) {
-        if (noteLikeMapper.exists(noteId, userId) > 0) {
+        try {
+            noteLikeMapper.insert(noteId, userId);
+        } catch (DuplicateKeyException e) {
             throw new IllegalArgumentException("已点过赞");
         }
         // 先写 DB，成功后再改 Redis
-        noteLikeMapper.insert(noteId, userId);
         userNoteIdsCache.evictLiked(userId);
         incrCount(noteId);
         publishLikeNotify(userId, noteId);
