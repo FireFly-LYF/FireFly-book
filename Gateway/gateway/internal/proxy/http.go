@@ -230,6 +230,11 @@ func rewrite(pr *httputil.ProxyRequest, remote *url.URL, stripPrefix string, hma
 			pr.Out.Header.Set("X-Forwarded-For", clientIP)
 		}
 	}
+
+	// 透传 / 保证下游有 X-Request-Id（RequestLogger 已保证入站有值）
+	if rid := pr.In.Header.Get("X-Request-Id"); rid != "" {
+		pr.Out.Header.Set("X-Request-Id", rid)
+	}
 }
 
 func pickTarget(c *gin.Context, b lb.Balancer) (string, bool) {

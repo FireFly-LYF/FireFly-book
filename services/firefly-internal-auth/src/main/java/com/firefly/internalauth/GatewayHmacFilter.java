@@ -13,7 +13,7 @@ import java.io.IOException;
 
 /**
  * 校验网关注入的 X-Gateway-Ts / X-Gateway-Sign；拒绝伪造的 X-User-Id。
- * /health 放行；/files/** 跳过网关身份头（由 media SignedFileFilter 验签名）。
+ * /health、/actuator/** 放行；/files/** 跳过网关身份头（由 media SignedFileFilter 验签名）。
  */
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class GatewayHmacFilter extends OncePerRequestFilter {
@@ -33,7 +33,7 @@ public class GatewayHmacFilter extends OncePerRequestFilter {
         if (path == null) {
             return false;
         }
-        if ("/health".equals(path)) {
+        if ("/health".equals(path) || path.startsWith("/actuator")) {
             return true;
         }
         return path.startsWith("/files/");

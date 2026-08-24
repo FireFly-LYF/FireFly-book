@@ -69,9 +69,9 @@
 
 | ID | 状态 | 风险 | 证据位置 | 上线后果 | 建议方向 |
 |----|------|------|----------|----------|----------|
-| O1 | 未改 | 无 Actuator / Micrometer / Tracing | 各服务 `pom.xml` | 难定位延迟、错误率、依赖健康 | `/actuator/health` + 指标 + TraceId 贯穿 |
-| O2 | 未改 | Health 仅为字符串 `"OK"` | 各 `HealthController` | 网关认为健康，但 DB/MQ 已挂 | 探真实依赖；区分 liveness/readiness |
-| O3 | 未改 | Java 侧无统一结构化字段（userId、requestId） | 对比网关已有 RequestLogger | 排障无法串请求 | 网关透传 + MDC |
+| O1 | **已缓解** | 无 Actuator / Micrometer / Tracing | 各服务 `actuator` + `prometheus`；`firefly-observability.yml` | `/actuator/health`、`/actuator/prometheus` 可用 | 完整 OpenTelemetry/Jaeger 可后做 |
+| O2 | **已修复** | Health 仅为字符串 `"OK"` | `ActuatorHealthAliasController`；网关优先探 `/actuator/health` | DB/MQ/Redis 挂则 health DOWN（503） | search 未探 ES；compose 可改 readiness |
+| O3 | **已修复** | Java 侧无统一结构化字段（userId、requestId） | `RequestIdFilter` + MDC；网关生成/透传 `X-Request-Id` | 日志可串 requestId/userId | 服务间 RestTemplate 已透传 RequestId |
 
 ---
 
@@ -94,7 +94,7 @@
 2. **媒体与部署剩余**（D1–D2）：对象存储；K8s/Secret Manager；每服务可执行 schema  
 3. **MQ 可靠剩余**：user/social 通知侧 Outbox；监控 DEAD  
 4. **池大小**：生产按监控再调 `HIKARI_MAX_POOL`（R6 列表缓存已铺开）  
-5. **可观测**（O1–O3）：真实 health、指标、TraceId  
+5. **可观测剩余**：search 探 ES；Prometheus/Grafana 编排；OpenTelemetry  
 
 ### 已处理（勿再当未改项排期）
 
@@ -124,5 +124,8 @@
 | **R4** | 限流：合理默认阈值 + `key_by=user_ip` + 路由级 `routes`（login/register/media/search） |
 | **R5** | ES：去掉 `*q*` wildcard；IK mapping；限 q 长度；禁前导通配；`Dockerfile.elasticsearch` 装 IK；`ES_RECREATE_INDICES` 一次性重建 |
 | **R6** | 各服务显式 Hikari 池（user/content 15、feed/social 10、notify/media 8）；详情+列表 Redis 缓存 TTL 10min，写后删（用户/笔记墙/关注/评论/赞藏/通知/媒体） |
+| **O1** | Actuator + Prometheus；共享 `firefly-observability.yml` |
+| **O2** | `/health` 别名读 Actuator 聚合健康；网关 registry 优先 `/actuator/health` |
+| **O3** | `RequestIdFilter` MDC；网关 `X-Request-Id` 生成/透传/打日志 |
 
 网关侧既有正向设计（清客户端 `X-User-Id` 再注入、路由级熔断、笔记 create/delete 的 afterCommit）继续保留。

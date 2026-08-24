@@ -3,6 +3,10 @@ server:
   port: ${SERVER_PORT:9003}
 
 spring:
+  application:
+    name: media-service
+  config:
+    import: optional:classpath:firefly-observability.yml
   servlet:
     multipart:
       max-file-size: 10MB
@@ -37,3 +41,10 @@ firefly:
     enabled: true
     hmac-secret: ${INTERNAL_HMAC_SECRET}
     skew-sec: 60
+
+management:
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false

@@ -4,6 +4,10 @@
   port: ${SERVER_PORT:9001}
 
 spring:
+  application:
+    name: user-service
+  config:
+    import: optional:classpath:firefly-observability.yml
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/user?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: ${MYSQL_USER:root}

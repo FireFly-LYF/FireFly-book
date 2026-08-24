@@ -13,6 +13,12 @@ public class InternalAuthAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public RequestIdFilter requestIdFilter() {
+        return new RequestIdFilter();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public GatewayHmacFilter gatewayHmacFilter(InternalAuthProperties props) {
         return new GatewayHmacFilter(props);
     }

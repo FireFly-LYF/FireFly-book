@@ -5,6 +5,8 @@
 spring:
   application:
     name: social-service
+  config:
+    import: optional:classpath:firefly-observability.yml
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/social?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: ${MYSQL_USER:root}

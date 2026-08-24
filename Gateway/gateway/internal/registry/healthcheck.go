@@ -39,7 +39,7 @@ func probeEndpoint(client *http.Client, ep upstream.Endpoint) bool {
 	tcpOK := true
 
 	if ep.ProbeHTTP() {
-		httpOK = httpProbe(client, ep.HTTPURL+"/health")
+		httpOK = httpProbePreferActuator(client, ep.HTTPURL)
 	}
 	if ep.ProbeGRPC() {
 		grpcOK = tcpProbe(ep.GRPCAddr, 2*time.Second)
@@ -48,6 +48,14 @@ func probeEndpoint(client *http.Client, ep upstream.Endpoint) bool {
 		tcpOK = tcpProbe(ep.TCPAddr, 2*time.Second)
 	}
 	return httpOK && grpcOK && tcpOK
+}
+
+func httpProbePreferActuator(client *http.Client, baseURL string) bool {
+	// Java 服务：真探依赖；演示下游仍只有 /health
+	if httpProbe(client, baseURL+"/actuator/health") {
+		return true
+	}
+	return httpProbe(client, baseURL+"/health")
 }
 
 func httpProbe(client *http.Client, url string) bool {
