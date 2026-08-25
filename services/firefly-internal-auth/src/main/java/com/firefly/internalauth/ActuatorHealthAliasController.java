@@ -1,8 +1,8 @@
 package com.firefly.internalauth;
 
-import org.springframework.boot.actuate.health.HealthComponent;
-import org.springframework.boot.actuate.health.HealthEndpoint;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.actuate.endpoint.HealthDescriptor;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,7 +24,7 @@ public class ActuatorHealthAliasController {
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> health() {
-        HealthComponent component = healthEndpoint.health();
+        HealthDescriptor component = healthEndpoint.health();
         boolean up = Status.UP.equals(component.getStatus());
         return ResponseEntity
                 .status(up ? 200 : 503)
