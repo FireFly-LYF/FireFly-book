@@ -1,3 +1,10 @@
 {
-    "java.compile.nullAnalysis.mode": "disabled"
+    "java.compile.nullAnalysis.mode": "disabled",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/services-ai/firefly-ai-common/src",
+        "${workspaceFolder}/services-ai/moderation-service/src",
+        "${workspaceFolder}/services-ai/tagging-service/src",
+        "${workspaceFolder}/services-ai/recommend-service/src"
+    ],
+    "python.analysis.diagnosticMode": "workspace"
 }

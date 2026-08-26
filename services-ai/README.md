@@ -2,7 +2,7 @@
 
 FireFly-book 的 Python AI 栈：审核、标签、推荐。与 `services/`（Java）平级。
 
-当前为**目录骨架**，业务逻辑尚未实现。Docker / 启动脚本在仓库根 `deploy/`。
+当前 **moderation-service** 已实现 P0 规则审核；tagging / recommend 仍为骨架。
 
 ## 结构
 
@@ -59,11 +59,11 @@ python -m recommend_service.main
 
 ## 与 Java 的接线（待实现）
 
-| 事件 / API | 生产者 | 消费者 / 调用方 |
-|------------|--------|-----------------|
-| `note.created` | content-service | moderation-service |
-| `note.moderated` | moderation-service | tagging-service |
-| `POST /internal/rank` | feed-service | recommend-service |
+| 事件 / API | 生产者 | 消费者 / 调用方 | 状态 |
+|------------|--------|-----------------|------|
+| `note.created` | content-service | moderation-service | 已实现 |
+| `note.moderated` | moderation-service | tagging-service | 审核侧已实现 |
+| `POST /internal/rank` | feed-service | recommend-service | 待实现 |
 
 Python 服务不注册 Gateway，仅内网 + HMAC。
 

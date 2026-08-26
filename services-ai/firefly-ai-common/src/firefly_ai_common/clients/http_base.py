@@ -109,6 +109,22 @@ class InternalHttpClient:
         response = self.request("GET", path, user_id=user_id, params=params)
         return self._parse_json(response)
 
+    def get_bytes(
+        self,
+        path: str,
+        *,
+        user_id: str | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> tuple[bytes, str]:
+        response = self.request("GET", path, user_id=user_id, params=params)
+        if response.status_code >= 400:
+            raise InternalHttpError(
+                f"HTTP {response.status_code}: {response.text[:500]}",
+                status_code=response.status_code,
+            )
+        content_type = response.headers.get("content-type", "application/octet-stream")
+        return response.content, content_type.split(";", 1)[0].strip()
+
     def post_json(
         self,
         path: str,

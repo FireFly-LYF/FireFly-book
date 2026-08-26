@@ -10,6 +10,7 @@ public class NoteIndexEvent {
     private String title;
     private String content;
     private String coverUrl;
+    private java.util.List<String> mediaUrls;
 
     public NoteIndexEvent() {
     }
@@ -24,4 +25,6 @@ public class NoteIndexEvent {
     public void setContent(String content) { this.content = content; }
     public String getCoverUrl() { return coverUrl; }
     public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
+    public java.util.List<String> getMediaUrls() { return mediaUrls; }
+    public void setMediaUrls(java.util.List<String> mediaUrls) { this.mediaUrls = mediaUrls; }
 }

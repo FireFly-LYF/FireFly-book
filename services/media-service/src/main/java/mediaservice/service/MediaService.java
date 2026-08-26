@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -114,4 +115,39 @@ public class MediaService {
         }
         return u;
     }
+
+    /** 内网直读原图字节（不经签名 URL）。 */
+    public MediaFileContent readFileBytes(String rawPath) throws IOException {
+        String path = canonicalize(rawPath);
+        String filename = path.substring("/files/".length());
+        Path root = Paths.get(mediaProperties.getStorageDir()).toAbsolutePath().normalize();
+        Path file = root.resolve(filename).normalize();
+        if (!file.startsWith(root)) {
+            throw new IllegalArgumentException("非法媒体路径");
+        }
+        if (!Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("文件不存在");
+        }
+        byte[] bytes = Files.readAllBytes(file);
+        Optional<ImageProbe.DetectedImage> detected = ImageProbe.detect(bytes);
+        String contentType = detected.map(ImageProbe.DetectedImage::contentType)
+                .orElse(contentTypeFromExtension(path));
+        return new MediaFileContent(bytes, contentType);
+    }
+
+    private static String contentTypeFromExtension(String path) {
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        if (lower.endsWith(".png")) {
+            return "image/png";
+        }
+        if (lower.endsWith(".gif")) {
+            return "image/gif";
+        }
+        if (lower.endsWith(".webp")) {
+            return "image/webp";
+        }
+        return "image/jpeg";
+    }
+
+    public record MediaFileContent(byte[] bytes, String contentType) {}
 }

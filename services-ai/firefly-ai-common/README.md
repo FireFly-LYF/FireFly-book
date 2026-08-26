@@ -12,6 +12,7 @@ FireFly Python AI 公共库，对标 Java `services/firefly-internal-auth`。
 | `auth.hmac` | 与 `GatewayHmacSupport` 一致的 HMAC 签名 |
 | `clients.http_base` | 内网 HTTP 客户端（自动带 HMAC 头） |
 | `clients.content_client` | 调 content-service 内部 API |
+| `clients.media_client` | 内网直读 media-service 原图（图片审核） |
 | `clients.redis_client` | 热门榜 Redis ZSET |
 | `events.*` | MQ 事件 Pydantic 模型（camelCase 别名） |
 | `models.rank` | 推荐排序 DTO |
@@ -52,9 +53,10 @@ consumer = QueueConsumer(
 
 见 `services-ai/.env.example`（`RABBITMQ_*`、`INTERNAL_HMAC_SECRET`、`CONTENT_BASE_URL` 等）。
 
-## content-service 内部 API（待 Java 实现）
+## content-service / media-service 内部 API
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `ContentClient.update_moderation_status` | `PATCH /api/internal/note/{id}/status` | 审核回写状态 |
-| `ContentClient.set_tags` | `PUT /api/internal/note/{id}/tags` | 写入标签 |
+| `ContentClient.set_tags` | `PUT /api/internal/note/{id}/tags` | 写入标签（待 Java 实现） |
+| `MediaClient.fetch_bytes(path)` | `GET /api/internal/files?path=/files/...` | 内网读原图字节 |

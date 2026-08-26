@@ -1,10 +1,18 @@
-# FireFly Python AI 栈（骨架）
+# FireFly Python AI 栈
 # 用法（仓库根目录）：
 #   docker compose -f deploy/docker-compose.ai.yml --env-file .env up -d --build
 # 与全栈 Java 组合：
 #   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.ai.yml --env-file .env up -d --build
 
 services:
+  nsfw-detector:
+    # latest 偶发 attestation 拉取失败；固定 v1.12
+    image: vxlink/nsfw_detector:v1.12
+    container_name: ff-nsfw-detector
+    ports:
+      - "3333:3333"
+    restart: unless-stopped
+
   moderation-service:
     build:
       context: ../services-ai
@@ -20,7 +28,13 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
       CONTENT_BASE_URL: ${CONTENT_BASE_URL:-http://content-service:9002}
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:-http://media-service:9003}
+      NSFW_DETECTOR_URL: ${NSFW_DETECTOR_URL:-http://nsfw-detector:3333}
+      NSFW_THRESHOLD: ${NSFW_THRESHOLD:-0.5}
+      IMAGE_MODERATION_ENABLED: ${IMAGE_MODERATION_ENABLED:-true}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      - nsfw-detector
     restart: unless-stopped
 
   tagging-service:

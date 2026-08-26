@@ -39,16 +39,19 @@ class QueueConsumer:
         routing_keys: list[str],
         handler: MessageHandler,
         settings: FireflyAISettings | None = None,
+        connection: AbstractRobustConnection | None = None,
     ) -> None:
         self._queue_name = queue_name
         self._dlq_name = dlq_name
         self._routing_keys = routing_keys
         self._handler = handler
         self._settings = settings or load_settings()
+        self._external_connection = connection
         self._connection: AbstractRobustConnection | None = None
+        self._owns_connection = connection is None
 
     async def run(self) -> None:
-        self._connection = await connect_rabbit(self._settings)
+        self._connection = self._external_connection or await connect_rabbit(self._settings)
         channel = await open_channel(self._connection)
         queue = await declare_worker_queue(
             channel,
@@ -64,7 +67,7 @@ class QueueConsumer:
         await queue.consume(self._on_message, no_ack=False)
 
     async def close(self) -> None:
-        if self._connection is not None:
+        if self._owns_connection and self._connection is not None:
             await self._connection.close()
             self._connection = None
 

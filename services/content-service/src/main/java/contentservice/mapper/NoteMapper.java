@@ -63,6 +63,9 @@ public interface NoteMapper {
     @Update("UPDATE note SET title=#{title}, content=#{content}, cover_url=#{coverUrl} WHERE id=#{id}")
     int update(Note note);
 
+    @Update("UPDATE note SET status=#{status} WHERE id=#{id}")
+    int updateStatus(@Param("id") Long id, @Param("status") int status);
+
     @Delete("DELETE FROM note WHERE id=#{id}")
     int delete(Long id);
 }

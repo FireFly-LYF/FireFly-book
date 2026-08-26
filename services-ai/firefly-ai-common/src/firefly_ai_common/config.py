@@ -29,6 +29,7 @@ class FireflyAISettings(BaseSettings):
     hmac_skew_sec: int = 60
 
     content_base_url: str = "http://127.0.0.1:9002"
+    media_base_url: str = "http://127.0.0.1:9003"
 
     http_connect_timeout_sec: float = 2.0
     http_read_timeout_sec: float = 3.0

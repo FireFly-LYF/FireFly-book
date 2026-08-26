@@ -102,10 +102,13 @@ public class NoteService {
             noteCache.putMedia(n.getId(), List.of());
         }
         noteListCache.evictUser(userId);
+        List<String> mediaUrls = urls != null ? List.copyOf(urls) : List.of();
         enqueueAndKick(
                 MqConstants.RK_NOTE_CREATED,
                 n.getId(),
-                NoteIndexEvent.from(n.getId(), n.getUserId(), n.getTitle(), n.getContent(), n.getCoverUrl()));
+                NoteIndexEvent.from(
+                        n.getId(), n.getUserId(), n.getTitle(), n.getContent(),
+                        n.getCoverUrl(), mediaUrls));
 
         return toDetail(n);
     }
@@ -255,9 +258,37 @@ public class NoteService {
                 updated.getId(),
                 NoteIndexEvent.from(
                         updated.getId(), updated.getUserId(),
-                        updated.getTitle(), updated.getContent(), updated.getCoverUrl()));
+                        updated.getTitle(), updated.getContent(), updated.getCoverUrl(),
+                        listMediaUrls(noteId)));
 
         return updated;
+    }
+
+    /**
+     * AI 审核回写：拒绝时 status=2，并从 search/feed 下架（note.deleted）。
+     */
+    @Transactional
+    public void applyModerationStatus(Long noteId, int status, String reason) {
+        if (status != 1 && status != 2) {
+            throw new IllegalArgumentException("status 仅支持 1(通过) 或 2(拒绝)");
+        }
+        Note n = findById(noteId);
+        if (n == null) {
+            throw new IllegalArgumentException("笔记不存在");
+        }
+        Integer prev = n.getStatus();
+        if (prev != null && prev == status) {
+            return;
+        }
+        noteMapper.updateStatus(noteId, status);
+        noteCache.evict(noteId);
+        noteListCache.evictUser(n.getUserId());
+        if (prev != null && prev == 1 && status == 2) {
+            enqueueAndKick(
+                    MqConstants.RK_NOTE_DELETED,
+                    noteId,
+                    NoteIndexEvent.deleted(noteId, n.getUserId()));
+        }
     }
 
     @Transactional
@@ -291,16 +322,21 @@ public class NoteService {
     private NoteDetailResponse toDetail(Note note) {
         NoteDetailResponse r = new NoteDetailResponse();
         r.setNote(note);
-        List<String> urls = noteCache.getMedia(note.getId());
+        List<String> urls = listMediaUrls(note.getId());
+        r.setMediaUrls(urls);
+        return r;
+    }
+
+    private List<String> listMediaUrls(Long noteId) {
+        List<String> urls = noteCache.getMedia(noteId);
         if (urls == null) {
-            urls = noteMediaMapper.listUrlsByNoteId(note.getId());
+            urls = noteMediaMapper.listUrlsByNoteId(noteId);
             if (urls == null) {
                 urls = List.of();
             }
-            noteCache.putMedia(note.getId(), urls);
+            noteCache.putMedia(noteId, urls);
         }
-        r.setMediaUrls(urls);
-        return r;
+        return urls;
     }
 
     private Note requireOwned(Long userId, Long noteId) {
