@@ -46,7 +46,7 @@ public class FeedService {
             if (fromDb != null && !fromDb.isEmpty()) {
                 timelineCache.pushBatch(userId, fromDb);
                 noteIds = fromDb.stream()
-                        .map(FeedInbox::getNoteId)
+                        .map(inbox -> inbox.getNoteId())
                         .filter(id -> id != null)
                         .limit(limit)
                         .toList();
@@ -75,7 +75,7 @@ public class FeedService {
         List<FeedItem> merged = contentClient.listLatestByUsers(followingIds, PER_AUTHOR);
         return merged.stream()
                 .sorted(Comparator.comparing(
-                        FeedItem::getCreatedAt,
+                        (FeedItem item) -> item.getCreatedAt(),
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(limit)
                 .toList();

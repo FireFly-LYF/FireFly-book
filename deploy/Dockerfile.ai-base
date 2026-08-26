@@ -1,0 +1,7 @@
+# 可选：带 ML 依赖的 Python AI 基础镜像（P1+ 使用）
+# 骨架阶段未启用
+
+FROM python:3.11-slim
+
+WORKDIR /opt
+RUN pip install --no-cache-dir --upgrade pip

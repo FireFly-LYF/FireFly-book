@@ -1,0 +1,57 @@
+# FireFly Python AI 栈（骨架）
+# 用法（仓库根目录）：
+#   docker compose -f deploy/docker-compose.ai.yml --env-file .env up -d --build
+# 与全栈 Java 组合：
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.ai.yml --env-file .env up -d --build
+
+services:
+  moderation-service:
+    build:
+      context: ../services-ai
+      dockerfile: moderation-service/Dockerfile
+    container_name: ff-moderation
+    ports:
+      - "9101:9101"
+    environment:
+      MODERATION_SERVICE_PORT: "9101"
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
+      CONTENT_BASE_URL: ${CONTENT_BASE_URL:-http://content-service:9002}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+
+  tagging-service:
+    build:
+      context: ../services-ai
+      dockerfile: tagging-service/Dockerfile
+    container_name: ff-tagging
+    ports:
+      - "9102:9102"
+    environment:
+      TAGGING_SERVICE_PORT: "9102"
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
+      CONTENT_BASE_URL: ${CONTENT_BASE_URL:-http://content-service:9002}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+
+  recommend-service:
+    build:
+      context: ../services-ai
+      dockerfile: recommend-service/Dockerfile
+    container_name: ff-recommend
+    ports:
+      - "9103:9103"
+    environment:
+      RECOMMEND_SERVICE_PORT: "9103"
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped

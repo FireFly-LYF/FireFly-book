@@ -1,0 +1,14 @@
+[project]
+name = "firefly-ai-services"
+version = "0.1.0"
+description = "FireFly-book Python AI workspace (moderation, tagging, recommend)"
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.uv.workspace]
+members = [
+    "firefly-ai-common",
+    "moderation-service",
+    "tagging-service",
+    "recommend-service",
+]

@@ -1,0 +1,16 @@
+[project]
+name = "firefly-ai-common"
+version = "0.1.0"
+description = "Shared library for FireFly Python AI services"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/firefly_ai_common"]

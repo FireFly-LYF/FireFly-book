@@ -1,0 +1,5 @@
+# services-ai 本地忽略（根 .gitignore 已覆盖通用 Python 规则）
+.env
+.venv/
+__pycache__/
+*.egg-info/

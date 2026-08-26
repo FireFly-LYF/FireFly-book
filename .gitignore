@@ -83,6 +83,22 @@ dist/
 .output/
 *.tsbuildinfo
 
+# ----- Python（services-ai）-----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.uv/
+*.whl
+
 # ----- Go（若根仓一并纳入） -----
 *.exe
 *.exe~

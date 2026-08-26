@@ -194,7 +194,10 @@ public class NoteService {
                 out.addAll(part);
             }
         }
-        out.sort(Comparator.comparing(Note::getId, Comparator.nullsLast(Long::compareTo)).reversed());
+        out.sort(Comparator.comparing(
+                (Note note) -> note.getId(),
+                Comparator.nullsLast(Comparator.naturalOrder()))
+            .reversed());
         return out;
     }
 
