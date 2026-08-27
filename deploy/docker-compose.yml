@@ -196,6 +196,9 @@ services:
         SERVICE: search-service
     environment:
       <<: *java-env
+    ports:
+      # 本机 Python 跑 assistant 时需 HMAC 调 search；Java 容器内端口 9007
+      - "9007:9007"
     depends_on:
       rabbitmq:
         condition: service_healthy

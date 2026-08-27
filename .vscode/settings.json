@@ -3,8 +3,7 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}/services-ai/firefly-ai-common/src",
         "${workspaceFolder}/services-ai/moderation-service/src",
-        "${workspaceFolder}/services-ai/tagging-service/src",
-        "${workspaceFolder}/services-ai/recommend-service/src"
+        "${workspaceFolder}/services-ai/assistant-service/src"
     ],
     "python.analysis.diagnosticMode": "workspace"
 }

@@ -7,10 +7,6 @@ RK_NOTE_CREATED = "note.created"
 RK_NOTE_UPDATED = "note.updated"
 RK_NOTE_DELETED = "note.deleted"
 RK_NOTE_MODERATED = "note.moderated"
-RK_NOTE_TAGGED = "note.tagged"
 
 QUEUE_MODERATION_NOTE = "moderation.note.events"
 QUEUE_MODERATION_NOTE_DLQ = "moderation.note.events.dlq"
-
-QUEUE_TAGGING_NOTE = "tagging.note.events"
-QUEUE_TAGGING_NOTE_DLQ = "tagging.note.events.dlq"

@@ -343,6 +343,104 @@ export function searchApi() {
   }
 }
 
+/** 解析 SSE 文本块 */
+function parseSseBlock(block, handlers) {
+  if (!block.trim()) return
+  let event = 'message'
+  let data = ''
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim()
+    else if (line.startsWith('data:')) data += line.slice(5).trim()
+  }
+  if (!data) return
+  let json
+  try {
+    json = JSON.parse(data)
+  } catch {
+    return
+  }
+  if (event === 'meta') handlers.onMeta?.(json)
+  else if (event === 'delta') handlers.onDelta?.(json.text ?? '')
+  else if (event === 'done') handlers.onDone?.(json)
+  else if (event === 'error') handlers.onError?.(json.message || 'AI 流式失败')
+}
+
+/** AI 搜索助手（SSE 流式） */
+async function searchStreamRequest(url, body, handlers, signal, allowRefresh = true) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    }),
+    body: JSON.stringify(body),
+    signal,
+  })
+
+  if (res.status === 401 && allowRefresh && !isAuthPublicPath(url)) {
+    const ok = await refreshAccessToken()
+    if (ok) return searchStreamRequest(url, body, handlers, signal, false)
+    saveAuthSession(null)
+    handlers.onError?.('未登录')
+    return { status: 401 }
+  }
+
+  if (!res.ok) {
+    const text = await res.text()
+    let msg = text
+    try {
+      const j = JSON.parse(text)
+      msg = j.message || j.detail || text
+    } catch {
+      /* keep raw */
+    }
+    handlers.onError?.(msg || `HTTP ${res.status}`)
+    return { status: res.status }
+  }
+
+  const reader = res.body?.getReader()
+  if (!reader) {
+    handlers.onError?.('浏览器不支持流式响应')
+    return { status: 0 }
+  }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop() ?? ''
+    for (const block of parts) parseSseBlock(block, handlers)
+  }
+  if (buffer.trim()) parseSseBlock(buffer, handlers)
+  return { status: res.status }
+}
+
+/** AI 搜索助手：站内笔记 + 网络 + LLM（noteCandidates 由前端 search 结果传入，避免重复检索） */
+export function assistantApi() {
+  return {
+    search: (query, includeWeb = true, noteCandidates = null) =>
+      request('/api/ai/search', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          query,
+          includeWeb,
+          ...(noteCandidates?.length ? { noteCandidates } : {}),
+        }),
+      }),
+    searchStream: (query, includeWeb = false, handlers = {}, signal = null) =>
+      searchStreamRequest(
+        '/api/ai/search/stream',
+        { query, includeWeb },
+        handlers,
+        signal,
+      ),
+  }
+}
+
 export function toLocalMediaUrl(url) {
   if (!url) return ''
   let u = String(url)

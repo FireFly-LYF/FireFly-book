@@ -1,82 +1,98 @@
 # services-ai
 
-FireFly-book 的 Python AI 栈：审核、标签、推荐。与 `services/`（Java）平级。
+FireFly-book 的 Python AI 栈：内容审核、AI 搜索助手。与 `services/`（Java）平级。
 
-当前 **moderation-service** 已实现 P0 规则审核；tagging / recommend 仍为骨架。
+| 服务 | 端口 | 职责 |
+|------|------|------|
+| moderation-service | 9101 | MQ 消费 `note.created`，文本/图片审核 |
+| assistant-service | 9102 | 用户搜索时 AI 问答（笔记 + 网络 + LLM） |
 
 ## 结构
 
 ```text
 services-ai/
-  firefly-ai-common/      公共库（对标 firefly-internal-auth）
-  moderation-service/     审核（MQ 消费 note.created）
-  tagging-service/         标签（MQ 消费 note.moderated）
-  recommend-service/       推荐排序（HTTP，供 feed-service 调用）
+  firefly-ai-common/      公共库
+  moderation-service/     审核
+  assistant-service/      AI 搜索助手
 ```
 
 ## 环境
 
 - Python 3.11+
-- 可选：[uv](https://github.com/astral-sh/uv)（workspace 联调更方便）
+- 可选：[uv](https://github.com/astral-sh/uv)
 
-## 本地准备（骨架阶段）
+## 本地准备
 
 ```powershell
 cd services-ai
 copy .env.example .env
 # 填写 RABBITMQ_PASSWORD、INTERNAL_HMAC_SECRET（与根目录 .env 一致）
+# assistant 可选：LLM_API_KEY、LLM_BASE_URL
 
-# 方式 A：uv
 uv sync
-
-# 方式 B：pip
-pip install -e ./firefly-ai-common
-pip install -e ./moderation-service
-pip install -e ./tagging-service
-pip install -e ./recommend-service
+# 或
+pip install -e ./firefly-ai-common -e ./moderation-service -e ./assistant-service
 ```
 
-## 启动（占位）
-
-各服务入口仅暴露 `/health`，无业务逻辑：
+## 启动
 
 ```powershell
 # moderation-service :9101
 python -m moderation_service.main
 
-# tagging-service :9102
-python -m tagging_service.main
-
-# recommend-service :9103
-python -m recommend_service.main
+# assistant-service :9102
+python -m assistant_service.main
 ```
 
-或在仓库根目录：
+或仓库根目录：
 
 ```powershell
 .\deploy\scripts\start-ai.ps1
 ```
 
-## 与 Java 的接线（待实现）
+## 与 Java / Gateway 接线
 
-| 事件 / API | 生产者 | 消费者 / 调用方 | 状态 |
-|------------|--------|-----------------|------|
-| `note.created` | content-service | moderation-service | 已实现 |
-| `note.moderated` | moderation-service | tagging-service | 审核侧已实现 |
-| `POST /internal/rank` | feed-service | recommend-service | 待实现 |
+| 路径 / 事件 | 说明 | 状态 |
+|-------------|------|------|
+| `note.created` → moderation | content Outbox | 已实现 |
+| `POST /api/ai/search` | Gateway → assistant-service | 已实现 |
+| 站内检索 | assistant → search-service | 已实现 |
 
-Python 服务不注册 Gateway，仅内网 + HMAC。
+Python 业务服务不经 Gateway 直调 Java 时使用 HMAC；`assistant-service` 对外经 Gateway JWT。
 
-## Docker（可选，仓库根目录执行）
+## 启动方式（推荐本机 Python）
 
-仅 AI 栈：
-
-```powershell
-docker compose -f deploy/docker-compose.ai.yml --env-file .env up -d --build
-```
-
-与全栈 Java 组合：
+**Docker 拉 `python:3.11-slim` 卡住时（国内常见），不要用 `docker compose` 编 AI**，改用本机 Python：
 
 ```powershell
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.ai.yml --env-file .env up -d --build
+# 仓库根目录（自动 pip 安装 + 启动 9101/9102）
+.\deploy\scripts\start-ai.ps1
+
+# 只要搜索 AI、不要审核
+.\deploy\scripts\start-ai.ps1 -AssistantOnly
 ```
+
+Java 在 Docker、AI 在本机的组合：
+
+```powershell
+# 1. 只启动 Java + 基础设施（不 build AI，不拉 python 镜像）
+docker compose -f deploy/docker-compose.yml --env-file .env up -d
+
+# 2. 本机 AI
+.\deploy\scripts\start-ai.ps1 -AssistantOnly
+
+# 3. Gateway 容器访问本机 assistant（gateway-compose 已配 host.docker.internal:9102）
+docker compose -f deploy/docker-compose.yml --env-file .env restart gateway
+```
+
+前端：`cd web-console && npm run dev`
+
+## Docker 跑 AI（可选，需能拉 python 镜像）
+
+仅当本机已成功 `docker pull python:3.11-slim` 时使用 profile **`ai-docker`**：
+
+```powershell
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.ai.yml --env-file .env --profile ai-docker up -d --build assistant-service
+```
+
+并将 `gateway-compose.yaml` 里 `/api/ai` 上游改回 `http://assistant-service:9102`。

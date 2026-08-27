@@ -59,6 +59,9 @@ ratelimit:
     - prefix: /api/search
       rate: 10
       capacity: 20
+    - prefix: /api/ai
+      rate: 3
+      capacity: 6
     - prefix: /files
       rate: 40
       capacity: 80
@@ -76,7 +79,7 @@ registry:
 proxy:
   strip_prefix: ""
   # 等待上游响应头超时；超时返回 504 并计入熔断（响应体仍可流式转发）
-  response_header_timeout_sec: 10
+  response_header_timeout_sec: 60
 
 # 按路径转发到不同 Java 服务（第 13 章）
 routes:
@@ -121,8 +124,13 @@ routes:
     upstreams:
       - http: http://127.0.0.1:9007
         weight: 1
+  - id: ai-assistant
+    prefix: /api/ai
+    upstreams:
+      - http: http://127.0.0.1:9102
+        weight: 1
 
-# gRPC / TCP 演示下游（HTTP 已由 routes 接管；可留空协议字段）
+# gRPC / TCP 演示下游
 loadbalancer:
   strategy: round_robin
   upstreams:

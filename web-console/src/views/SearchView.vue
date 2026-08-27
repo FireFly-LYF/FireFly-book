@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { searchApi, toLocalMediaUrl } from '../api'
+import { assistantApi, searchApi, toLocalMediaUrl } from '../api'
 import SignedImg from '../components/SignedImg.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 
@@ -20,6 +20,14 @@ const notes = ref([])
 const users = ref([])
 const history = ref([])
 const inputRef = ref(null)
+
+const aiLoading = ref(false)
+const aiStreaming = ref(false)
+const aiAnswer = ref('')
+const aiNoteSources = ref([])
+const aiWebSources = ref([])
+const aiError = ref('')
+let aiAbort = null
 
 const showIdle = computed(() => !searched.value && !loading.value)
 
@@ -72,41 +80,106 @@ async function doSearch() {
   }
 
   pushHistory(keyword)
+  aiAbort?.abort()
+  aiAbort = new AbortController()
+  const { signal } = aiAbort
+
   searched.value = true
   loading.value = true
+  aiLoading.value = true
+  aiStreaming.value = false
   notes.value = []
   users.value = []
+  aiAnswer.value = ''
+  aiNoteSources.value = []
+  aiWebSources.value = []
+  aiError.value = ''
   try {
-    const [nRes, uRes] = await Promise.all([
-      searchApi().notes(keyword, 1, 20),
-      searchApi().users(keyword),
-    ])
-    if (nRes.status === 401 || uRes.status === 401) {
+    const notesPromise = searchApi().notes(keyword, 1, 20)
+    const usersPromise = searchApi().users(keyword)
+    const runAiStream = async () => {
+      const res = await assistantApi().searchStream(
+        keyword,
+        false,
+        {
+          onMeta: (data) => {
+            aiLoading.value = false
+            aiStreaming.value = true
+            aiNoteSources.value = data.noteSources || []
+            aiWebSources.value = data.webSources || []
+          },
+          onDelta: (text) => {
+            if (!text) return
+            aiLoading.value = false
+            aiStreaming.value = true
+            aiAnswer.value += text
+          },
+          onDone: (data) => {
+            aiStreaming.value = false
+            if (data?.answer) aiAnswer.value = data.answer
+          },
+          onError: (msg) => {
+            aiStreaming.value = false
+            aiError.value = msg || 'AI 回答暂不可用（请确认 assistant-service）'
+          },
+        },
+        signal,
+      )
+      if (res?.status === 401) throw new Error('401')
+      if (aiError.value) throw new Error(aiError.value)
+    }
+    const aiPromise = runAiStream()
+
+    const nRes = await notesPromise
+    if (nRes.status === 401) {
       emit('need-login')
       return
     }
     if (nRes.body?.code !== 0) {
       emit('toast', nRes.body?.message || '笔记搜索失败（请确认 search-service / ES）')
+      notes.value = []
     } else {
       notes.value = nRes.body.data || []
     }
-    if (uRes.body?.code !== 0) {
+
+    loading.value = false
+
+    const [uRes] = await Promise.all([usersPromise, aiPromise])
+
+    if (uRes?.status === 401) {
+      emit('need-login')
+      return
+    }
+    if (uRes?.body?.code !== 0) {
       emit('toast', uRes.body?.message || '用户搜索失败')
-    } else {
+    } else if (uRes?.body) {
       users.value = uRes.body.data || []
     }
   } catch (err) {
-    emit('toast', err?.message || '搜索请求失败')
+    if (err?.name === 'AbortError') return
+    if (err?.message === '401') {
+      emit('need-login')
+      return
+    }
+    if (!aiError.value) emit('toast', err?.message || '搜索请求失败')
   } finally {
     loading.value = false
+    aiLoading.value = false
   }
 }
 
 function clearQuery() {
+  aiAbort?.abort()
+  aiAbort = null
   q.value = ''
   searched.value = false
   notes.value = []
   users.value = []
+  aiAnswer.value = ''
+  aiNoteSources.value = []
+  aiWebSources.value = []
+  aiError.value = ''
+  aiStreaming.value = false
   nextTick(() => inputRef.value?.focus())
 }
 
@@ -119,6 +192,50 @@ function snippet(text, max = 72) {
 function coverOf(n) {
   return toLocalMediaUrl(n?.coverUrl)
 }
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/** 轻量 Markdown → HTML（加粗、列表、段落） */
+function formatAiAnswer(text) {
+  if (!text) return ''
+  const lines = String(text).trim().split('\n')
+  let html = ''
+  let inList = false
+
+  const flushList = () => {
+    if (inList) {
+      html += '</ul>'
+      inList = false
+    }
+  }
+
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+    const bullet = line.match(/^[-*•]\s+(.+)/)
+    if (bullet) {
+      if (!inList) {
+        html += '<ul>'
+        inList = true
+      }
+      html += `<li>${escapeHtml(bullet[1]).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</li>`
+      continue
+    }
+    flushList()
+    if (!line.trim()) continue
+    const body = escapeHtml(line).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    html += `<p>${body}</p>`
+  }
+  flushList()
+  return html
+}
+
+const aiAnswerHtml = computed(() => formatAiAnswer(aiAnswer.value))
 </script>
 
 <template>
@@ -158,6 +275,44 @@ function coverOf(n) {
     </template>
 
     <template v-else>
+      <section class="ai-block">
+        <div class="ai-hd">
+          <span class="ai-badge">AI</span>
+          <h3>智能回答</h3>
+        </div>
+        <div v-if="aiLoading" class="ai-loading pad-sm">
+          <span class="ai-dot" /><span class="ai-dot" /><span class="ai-dot" />
+          <span class="ai-loading-text">正在思考…</span>
+        </div>
+        <p v-else-if="aiError" class="ai-error pad-sm">{{ aiError }}</p>
+        <div v-else-if="aiAnswer || aiStreaming" class="ai-body pad-sm">
+          <div v-if="aiStreaming" class="ai-answer ai-streaming">
+            {{ aiAnswer }}<span class="ai-cursor" aria-hidden="true" />
+          </div>
+          <div v-else class="ai-answer" v-html="aiAnswerHtml" />
+          <div v-if="!aiStreaming && aiNoteSources.length" class="ai-ref-notes">
+            <span class="ai-ref-label">参考笔记</span>
+            <button
+              v-for="n in aiNoteSources"
+              :key="n.id"
+              type="button"
+              class="ai-ref-chip"
+              @click="$emit('open-note', n.id)"
+            >
+              {{ n.title || `笔记 #${n.id}` }}
+            </button>
+          </div>
+        </div>
+        <div v-if="!aiLoading && aiWebSources.length" class="ai-sources pad-sm">
+          <h4>网络参考</h4>
+          <ul>
+            <li v-for="(w, i) in aiWebSources" :key="i">
+              <a :href="w.url" target="_blank" rel="noopener noreferrer">{{ w.title }}</a>
+            </li>
+          </ul>
+        </div>
+      </section>
+
       <div class="tabs">
         <button type="button" :class="{ on: tab === 'note' }" @click="tab = 'note'">
           笔记 {{ notes.length }}
@@ -306,6 +461,177 @@ h3 {
 
 .muted { color: var(--ink-3); font-size: 0.82rem; }
 .pad { padding: 1.2rem 1rem; }
+.pad-sm { padding: 0.75rem 0.85rem; }
+
+.ai-block {
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #fff8f9 0%, #fff 100%);
+}
+
+.ai-hd {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.75rem 0.85rem 0;
+}
+
+.ai-hd h3 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.ai-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #ff2442, #ff6b81);
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+}
+
+.ai-answer {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.ai-answer :deep(p) {
+  margin: 0 0 0.65rem;
+}
+
+.ai-answer :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.ai-answer :deep(ul) {
+  margin: 0 0 0.65rem;
+  padding-left: 1.15rem;
+}
+
+.ai-answer :deep(li) {
+  margin-bottom: 0.35rem;
+}
+
+.ai-answer :deep(strong) {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ai-streaming {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--brand, #ff2442);
+  animation: ai-blink 0.9s step-end infinite;
+}
+
+@keyframes ai-blink {
+  50% { opacity: 0; }
+}
+
+.ai-body {
+  padding-bottom: 0.85rem;
+}
+
+.ai-ref-notes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.ai-ref-label {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  margin-right: 0.15rem;
+}
+
+.ai-ref-chip {
+  border: none;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 36, 66, 0.22);
+  color: var(--brand, #ff2442);
+  font-size: 0.74rem;
+  cursor: pointer;
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-ref-chip:active {
+  background: #fff5f6;
+}
+
+.ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ai-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand, #ff2442);
+  opacity: 0.35;
+  animation: ai-pulse 1.2s ease-in-out infinite;
+}
+
+.ai-dot:nth-child(2) { animation-delay: 0.15s; }
+.ai-dot:nth-child(3) { animation-delay: 0.3s; }
+
+.ai-loading-text {
+  font-size: 0.82rem;
+  color: var(--ink-3);
+  margin-left: 0.25rem;
+}
+
+@keyframes ai-pulse {
+  0%, 80%, 100% { opacity: 0.35; transform: scale(1); }
+  40% { opacity: 1; transform: scale(1.15); }
+}
+
+.ai-error {
+  color: #c62828;
+  font-size: 0.82rem;
+}
+
+.ai-sources h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+
+.ai-sources ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ai-sources li {
+  margin-bottom: 0.25rem;
+}
+
+.ai-sources a {
+  font-size: 0.78rem;
+  color: var(--brand, #ff2442);
+  text-decoration: none;
+}
+
+.ai-sources a:hover { text-decoration: underline; }
 
 .tags {
   display: flex;

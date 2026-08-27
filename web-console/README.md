@@ -29,7 +29,7 @@ Vite 将 `/api`、`/files` 代理到 Gateway `:8080`。
 | 互动 | 点赞/取消、收藏/取消、赞过与收藏列表、评论 |
 | 通知 | 通知列表、已读 |
 | 关注流 | `GET /api/feed/following`（feed-service 读扩散） |
-| 搜索 | 笔记/用户搜索（search-service + ES） |
+| 搜索 | 笔记/用户搜索 + AI 智能回答（assistant-service） |
 
 ## 占位中
 

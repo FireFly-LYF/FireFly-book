@@ -142,7 +142,7 @@ FireFly-book/
   start-all.ps1 / stop-all.ps1   本机一键启停
   .env.example                   密钥模板
   services/                      Java 微服务
-  services-ai/                   Python AI（审核 / 标签 / 推荐，骨架）
+  services-ai/                   Python AI（审核 / AI 搜索助手）
   Gateway/gateway/               Go 网关
   web-console/                   Vue 前端
   deploy/                        Docker Compose（Java + AI）、造数脚本

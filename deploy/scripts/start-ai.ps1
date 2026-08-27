@@ -1,24 +1,30 @@
-# 本地启动三个 AI 服务（骨架：仅 /health）
-# 用法（仓库根目录）：.\deploy\scripts\start-ai.ps1
+﻿# Start AI services locally (Python, no Docker image pull)
+# Usage from repo root: .\deploy\scripts\start-ai.ps1
+# Params: -AssistantOnly  -SkipInstall
+
+param(
+    [switch]$AssistantOnly,
+    [switch]$SkipInstall
+)
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..", "..")).Path
+$RepoRoot = (Resolve-Path (Join-Path (Join-Path $PSScriptRoot "..") "..")).Path
 $AiRoot = Join-Path $RepoRoot "services-ai"
 $EnvFile = Join-Path $AiRoot ".env"
 if (-not (Test-Path -LiteralPath $EnvFile)) {
     $EnvFile = Join-Path $RepoRoot ".env"
 }
 if (-not (Test-Path -LiteralPath $EnvFile)) {
-    Write-Host "请先配置 services-ai\.env 或仓库根 .env（含 RABBITMQ_PASSWORD、INTERNAL_HMAC_SECRET）" -ForegroundColor Yellow
+    Write-Host "Missing .env (need INTERNAL_HMAC_SECRET). Copy services-ai\.env.example" -ForegroundColor Yellow
     exit 1
 }
 
 function Import-DotEnv([string]$Path) {
-    Get-Content -LiteralPath $Path | ForEach-Object {
-        $line = $_.Trim()
-        if ($line -eq "" -or $line.StartsWith("#")) { return }
-        $idx = $line.IndexOf("=")
-        if ($idx -lt 1) { return }
+    foreach ($raw in Get-Content -LiteralPath $Path) {
+        $line = $raw.Trim()
+        if ($line -eq '' -or $line.StartsWith('#')) { continue }
+        $idx = $line.IndexOf('=')
+        if ($idx -lt 1) { continue }
         $key = $line.Substring(0, $idx).Trim()
         $val = $line.Substring($idx + 1).Trim()
         Set-Item -Path "Env:$key" -Value $val
@@ -26,15 +32,33 @@ function Import-DotEnv([string]$Path) {
 }
 
 Import-DotEnv $EnvFile
+
+if (-not $env:SEARCH_BASE_URL) {
+    Set-Item -Path Env:SEARCH_BASE_URL -Value "http://127.0.0.1:9007"
+}
+
 Set-Location $AiRoot
 
-$services = @(
-    @{ Name = "moderation-service"; Module = "moderation_service.main"; Port = 9101; Env = "MODERATION_SERVICE_PORT" },
-    @{ Name = "tagging-service"; Module = "tagging_service.main"; Port = 9102; Env = "TAGGING_SERVICE_PORT" },
-    @{ Name = "recommend-service"; Module = "recommend_service.main"; Port = 9103; Env = "RECOMMEND_SERVICE_PORT" }
-)
+$pipIndex = "https://pypi.tuna.tsinghua.edu.cn/simple"
+if (-not $SkipInstall) {
+    Write-Host "Installing Python packages..." -ForegroundColor Cyan
+    $pkgs = @("./firefly-ai-common", "./assistant-service")
+    if (-not $AssistantOnly) { $pkgs += "./moderation-service" }
+    foreach ($pkg in $pkgs) {
+        python -m pip install -e $pkg -i $pipIndex -q
+    }
+}
 
-Write-Host "启动 FireFly AI 服务（骨架）..." -ForegroundColor Cyan
+$services = @(
+    @{ Name = "assistant-service"; Module = "assistant_service.main"; Port = 9102; Env = "ASSISTANT_SERVICE_PORT" }
+)
+if (-not $AssistantOnly) {
+    $services = @(
+        @{ Name = "moderation-service"; Module = "moderation_service.main"; Port = 9101; Env = "MODERATION_SERVICE_PORT" }
+    ) + $services
+}
+
+Write-Host "Starting FireFly AI services..." -ForegroundColor Cyan
 
 foreach ($svc in $services) {
     $port = [int](Get-Item -Path "Env:$($svc.Env)" -ErrorAction SilentlyContinue).Value
@@ -45,7 +69,8 @@ foreach ($svc in $services) {
 }
 
 Write-Host ""
-Write-Host "已在新窗口启动三个进程。健康检查示例：" -ForegroundColor Green
-Write-Host "  curl.exe http://127.0.0.1:9101/health"
+Write-Host "Health check:" -ForegroundColor Green
+if (-not $AssistantOnly) {
+    Write-Host "  curl.exe http://127.0.0.1:9101/health"
+}
 Write-Host "  curl.exe http://127.0.0.1:9102/health"
-Write-Host "  curl.exe http://127.0.0.1:9103/health"

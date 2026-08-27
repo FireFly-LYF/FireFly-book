@@ -52,6 +52,9 @@ ratelimit:
     - prefix: /api/search
       rate: 10
       capacity: 20
+    - prefix: /api/ai
+      rate: 3
+      capacity: 6
     - prefix: /files
       rate: 40
       capacity: 80
@@ -66,7 +69,7 @@ registry:
 
 proxy:
   strip_prefix: ""
-  response_header_timeout_sec: 10
+  response_header_timeout_sec: 60
 
 routes:
   - id: user
@@ -109,6 +112,12 @@ routes:
     prefix: /api/search
     upstreams:
       - http: http://search-service:9007
+        weight: 1
+  - id: ai-assistant
+    prefix: /api/ai
+    upstreams:
+      # AI 默认本机 Python（deploy/scripts/start-ai.ps1）；Docker 跑 assistant 时改为 assistant-service:9102
+      - http: http://host.docker.internal:9102
         weight: 1
 
 loadbalancer:

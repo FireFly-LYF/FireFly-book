@@ -53,6 +53,3 @@ class EventPublisher:
 
     async def publish_note_moderated(self, payload: BaseModel) -> None:
         await self.publish(mq.RK_NOTE_MODERATED, payload)
-
-    async def publish_note_tagged(self, payload: BaseModel) -> None:
-        await self.publish(mq.RK_NOTE_TAGGED, payload)

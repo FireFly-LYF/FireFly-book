@@ -1,12 +1,13 @@
-# FireFly Python AI 栈
-# 用法（仓库根目录）：
-#   docker compose -f deploy/docker-compose.ai.yml --env-file .env up -d --build
-# 与全栈 Java 组合：
-#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.ai.yml --env-file .env up -d --build
+# FireFly Python AI 栈（可选；默认建议本机 Python，见 deploy/scripts/start-ai.ps1）
+#
+# 仅当本机能稳定拉取 python:3.11-slim 时使用 profile ai-docker：
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.ai.yml --env-file .env --profile ai-docker up -d --build
+#
+# 与全栈 Java 组合且 AI 仍用本机进程时：不要加 --profile ai-docker，只跑 Java compose + start-ai.ps1
 
 services:
   nsfw-detector:
-    # latest 偶发 attestation 拉取失败；固定 v1.12
+    profiles: ["ai-docker"]
     image: vxlink/nsfw_detector:v1.12
     container_name: ff-nsfw-detector
     ports:
@@ -14,6 +15,7 @@ services:
     restart: unless-stopped
 
   moderation-service:
+    profiles: ["ai-docker"]
     build:
       context: ../services-ai
       dockerfile: moderation-service/Dockerfile
@@ -37,35 +39,24 @@ services:
       - nsfw-detector
     restart: unless-stopped
 
-  tagging-service:
+  assistant-service:
+    profiles: ["ai-docker"]
     build:
       context: ../services-ai
-      dockerfile: tagging-service/Dockerfile
-    container_name: ff-tagging
+      dockerfile: assistant-service/Dockerfile
+    container_name: ff-assistant
     ports:
       - "9102:9102"
     environment:
-      TAGGING_SERVICE_PORT: "9102"
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
-      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      ASSISTANT_SERVICE_PORT: "9102"
+      SEARCH_BASE_URL: ${SEARCH_BASE_URL:-http://search-service:9007}
       INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
-      CONTENT_BASE_URL: ${CONTENT_BASE_URL:-http://content-service:9002}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    restart: unless-stopped
-
-  recommend-service:
-    build:
-      context: ../services-ai
-      dockerfile: recommend-service/Dockerfile
-    container_name: ff-recommend
-    ports:
-      - "9103:9103"
-    environment:
-      RECOMMEND_SERVICE_PORT: "9103"
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
+      INTERNAL_AUTH_ENABLED: "true"
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_TIMEOUT_SEC: ${LLM_TIMEOUT_SEC:-45}
+      WEB_SEARCH_ENABLED: ${WEB_SEARCH_ENABLED:-true}
+      WEB_SEARCH_MAX_RESULTS: ${WEB_SEARCH_MAX_RESULTS:-5}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     restart: unless-stopped
