@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"gateway/internal/upstream"
@@ -55,11 +56,19 @@ func httpProbePreferActuator(client *http.Client, baseURL string) bool {
 	if httpProbe(client, baseURL+"/actuator/health") {
 		return true
 	}
-	return httpProbe(client, baseURL+"/health")
+	if httpProbe(client, baseURL+"/health") {
+		return true
+	}
+	// actuator 卡住（例如依赖探测阻塞）时：端口能连上仍视为可达，避免全量 503
+	u, err := url.Parse(baseURL)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	return tcpProbe(u.Host, 2*time.Second)
 }
 
-func httpProbe(client *http.Client, url string) bool {
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+func httpProbe(client *http.Client, urlStr string) bool {
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, urlStr, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		return false

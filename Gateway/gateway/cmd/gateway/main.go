@@ -47,12 +47,22 @@ func main() {
 	for _, r := range cfg.RateLimitRouteQuotas() {
 		routes = append(routes, ratelimit.RouteQuota{Prefix: r.Prefix, Rate: r.Rate, Capacity: r.Capacity})
 	}
-	limiter := ratelimit.NewLimiter(client, cfg.RateLimitRate(), cfg.RateLimitCapacity(), cfg.RateLimitDailyLimit(), cfg.RateLimitKeyBy(), routes)
+	var limiter *ratelimit.Limiter
+	if cfg.RateLimitEnabled() {
+		limiter = ratelimit.NewLimiter(client, cfg.RateLimitRate(), cfg.RateLimitCapacity(), cfg.RateLimitDailyLimit(), cfg.RateLimitKeyBy(), routes)
+	} else {
+		log.Printf("ratelimit disabled (ratelimit.enabled=false)")
+	}
 	var breaker *registry.CircuitBreaker
 	if cfg.CircuitBreakerEnabled() {
 		breaker = registry.NewCircuitBreaker(cfg.CBThreshold(), cfg.CBCooldown())
 	}
-	recorder := redisx.NewStatsRecorder(client)
+	var recorder *redisx.StatsRecorder
+	if client != nil {
+		recorder = redisx.NewStatsRecorder(client)
+	} else {
+		log.Printf("stats recorder off (no redis)")
+	}
 
 	lbCfg := cfg.LBConfig()
 	var reg registry.Registry

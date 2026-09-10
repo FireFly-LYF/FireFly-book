@@ -287,7 +287,7 @@ wrk -t4 -c100 -d30s -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8080/
 
 - [ ] 有表格：直连 vs 网关（JWT 开/关、Redis 开/关）
 - [ ] 能解释 QPS 下降的主要原因（多一跳、序列化、锁、Redis RTT）
-- [ ] 压测脚本或命令写入 `Gateway/scripts/bench.ps1`
+- [ ] 压测脚本或命令写入仓库根目录 [`bench/`](../../../../bench/README.md)
 
 ---
 

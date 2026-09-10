@@ -65,9 +65,11 @@ type RedisConfig struct {
 }
 
 type RateLimitConfig struct {
-	Rate       int64 `yaml:"rate"`        // 默认：每秒补充令牌数（平均 QPS）
-	Capacity   int64 `yaml:"capacity"`    // 默认：令牌桶容量（突发上限）
-	DailyLimit int64 `yaml:"daily_limit"` // 每个限流键每日上限（QPD），0 表示不限制
+	// Enabled 为 false 时完全跳过限流中间件（对比实验用）；缺省/true 保持开启
+	Enabled    *bool  `yaml:"enabled"`
+	Rate       int64  `yaml:"rate"`        // 默认：每秒补充令牌数（平均 QPS）
+	Capacity   int64  `yaml:"capacity"`    // 默认：令牌桶容量（突发上限）
+	DailyLimit int64  `yaml:"daily_limit"` // 每个限流键每日上限（QPD），0 表示不限制
 	// KeyBy 限流键：user_ip（登录用户按 userId，否则按 IP）| ip | tenant
 	KeyBy  string                 `yaml:"key_by"`
 	Routes []RateLimitRouteConfig `yaml:"routes"` // 按路径前缀覆盖配额；最长前缀优先
@@ -455,6 +457,14 @@ func (c *Config) RedisAddr() string {
 		return "localhost:6379"
 	}
 	return c.Redis.Addr
+}
+
+// RateLimitEnabled 是否挂载限流中间件；yaml ratelimit.enabled=false 时关闭。
+func (c *Config) RateLimitEnabled() bool {
+	if c.RateLimit.Enabled != nil {
+		return *c.RateLimit.Enabled
+	}
+	return true
 }
 
 // RateLimitRate 返回 QPS 补充速率；<=0 时默认 5。

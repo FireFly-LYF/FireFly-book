@@ -1,0 +1,87 @@
+# WSL 本机对比：无限流、无熔断、无 Redis 统计
+#   cd Gateway/gateway && go run ./cmd/gateway -config ../../bench/config/gateway-wsl-compare.yaml
+
+server:
+  addr: ":8080"
+
+grpc:
+  listen: ""
+  auth_required: true
+
+tcp:
+  listen: ""
+
+jwt:
+  secret: "${JWT_SECRET}"
+  token_ttl: "30m"
+  api_required: true
+
+admin:
+  jwt_secret: "${ADMIN_JWT_SECRET}"
+  password: "${ADMIN_PASSWORD}"
+  token_ttl: "8h"
+
+internal_auth:
+  hmac_secret: "${INTERNAL_HMAC_SECRET}"
+
+tenants:
+  - tenant-a
+  - tenant-b
+
+redis:
+  addr: "127.0.0.1:1"
+
+ratelimit:
+  enabled: false
+  rate: 1
+  capacity: 1
+  daily_limit: 0
+  key_by: user_ip
+  routes: []
+
+circuit_breaker:
+  threshold: 0
+  cooldown_sec: 30
+
+registry:
+  type: memory
+  dsn: ""
+
+proxy:
+  strip_prefix: ""
+  response_header_timeout_sec: 60
+
+routes:
+  - id: user
+    prefix: /api/user
+    upstreams:
+      - http: http://127.0.0.1:9001
+        weight: 1
+  - id: content
+    prefix: /api/note
+    upstreams:
+      - http: http://127.0.0.1:9002
+        weight: 1
+  - id: social
+    prefix: /api/social
+    upstreams:
+      - http: http://127.0.0.1:9004
+        weight: 1
+  - id: notify
+    prefix: /api/notify
+    upstreams:
+      - http: http://127.0.0.1:9005
+        weight: 1
+
+loadbalancer:
+  strategy: round_robin
+  upstreams: []
+
+security:
+  ip_blocklist: []
+
+cors:
+  allow_credentials: true
+  allowed_origins:
+    - http://localhost:5173
+    - http://127.0.0.1:5173

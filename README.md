@@ -207,6 +207,7 @@ RabbitMQ 管理台：http://localhost:15672 （用户 `guest`，密码为 `.env`
 - 分服务教程：[`Java-Tutorial/md/README.md`](./Java-Tutorial/md/README.md)
 - 前端能力说明：[`web-console/README.md`](./web-console/README.md)
 - 上线风险清单：[`issue.md`](./issue.md)
+- **压测 / Go vs Java 网关对比**（独立目录，不混入业务代码）：[`bench/README.md`](./bench/README.md)
 - 关注流已接 `GET /api/feed/following`；发现页目前仍是前端临时聚合，全局推荐流尚未实现
 
 ### Git 提示

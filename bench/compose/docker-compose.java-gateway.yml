@@ -1,0 +1,32 @@
+# Spring Cloud Gateway 对比实验（可选容器）
+#   docker compose -f deploy/docker-compose.yml \
+#     -f bench/compose/docker-compose.bench.yml \
+#     -f bench/compose/docker-compose.java-gateway.yml \
+#     --env-file .env up -d --build
+
+services:
+  java-gateway:
+    build:
+      context: ../java-gateway
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: "8088"
+      SERVER_ADDRESS: "0.0.0.0"
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_HMAC_SECRET: ${INTERNAL_HMAC_SECRET}
+      USER_BASE_URL: http://user-service:9001
+      CONTENT_BASE_URL: http://content-service:9002
+      MEDIA_BASE_URL: http://media-service:9003
+      SOCIAL_BASE_URL: http://social-service:9004
+      NOTIFY_BASE_URL: http://notify-service:9005
+      FEED_BASE_URL: http://feed-service:9006
+      SEARCH_BASE_URL: http://search-service:9007
+    ports:
+      - "8088:8088"
+    depends_on:
+      - user-service
+      - content-service
+      - social-service
+      - notify-service
+    restart: unless-stopped

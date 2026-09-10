@@ -1,0 +1,63 @@
+server:
+  port: ${SERVER_PORT:8088}
+  address: ${SERVER_ADDRESS:0.0.0.0}
+
+firefly:
+  gateway:
+    jwt-secret: ${JWT_SECRET}
+    hmac-secret: ${INTERNAL_HMAC_SECRET}
+    api-required: true
+
+# 对比实验：不做限流，贴近 Go 容量轮（高限流）场景
+spring:
+  application:
+    name: java-gateway
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 60s
+      routes:
+        - id: user
+          uri: ${USER_BASE_URL:http://127.0.0.1:9001}
+          predicates:
+            - Path=/api/user/**
+        - id: content
+          uri: ${CONTENT_BASE_URL:http://127.0.0.1:9002}
+          predicates:
+            - Path=/api/note/**
+        - id: social
+          uri: ${SOCIAL_BASE_URL:http://127.0.0.1:9004}
+          predicates:
+            - Path=/api/social/**
+        - id: notify
+          uri: ${NOTIFY_BASE_URL:http://127.0.0.1:9005}
+          predicates:
+            - Path=/api/notify/**
+        - id: feed
+          uri: ${FEED_BASE_URL:http://127.0.0.1:9006}
+          predicates:
+            - Path=/api/feed/**
+        - id: search
+          uri: ${SEARCH_BASE_URL:http://127.0.0.1:9007}
+          predicates:
+            - Path=/api/search/**
+        - id: media
+          uri: ${MEDIA_BASE_URL:http://127.0.0.1:9003}
+          predicates:
+            - Path=/api/media/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: WARN

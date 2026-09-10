@@ -258,7 +258,7 @@ flowchart TB
 | Vue 管理界面 | `admin/` 前端工程 |
 | 大盘统计 | Dashboard 页 + `/gateway/statistics/*` |
 | iPanel / Docker 部署 | `Dockerfile` + `docker-compose.yml` |
-| wrk 压测 9k → 6.5k QPS | `scripts/bench.ps1` + 压测报告 |
+| wrk 压测 9k → 6.5k QPS | 见仓库根目录 [`bench/`](../../../bench/README.md) |
 | MySQL 租户管理 | `registry` MySQL 实现（可选） |
 | 三协议网关 | 阶段 3/⑦ 已有，阶段 4 文档与 Admin 展示 |
 

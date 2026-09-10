@@ -1,0 +1,4 @@
+target/
+reports/*.raw
+reports/*.raw.txt
+reports/*.raw/

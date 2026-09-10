@@ -1,8 +1,7 @@
-# FireFly / Gateway 压测：直连 Java vs 经网关
+# FireFly / Gateway 简易压测（hey）：直连 Java vs 经网关
 # 依赖：hey（go install github.com/rakyll/hey@latest）
-# 用法：在任意目录
-#   powershell -File Gateway/gateway/scripts/bench.ps1
-#   powershell -File Gateway/gateway/scripts/bench.ps1 -N 10000 -C 100
+#   powershell -File bench/scripts/bench-hey.ps1
+# 正式对比请用 WSL：bench/scripts/bench-gateway-fair.sh
 
 param(
     [int]$N = 5000,   # 总请求数

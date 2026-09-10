@@ -1,0 +1,26 @@
+# 压测 overlay：暴露业务端口供宿主机/WSL 网关直连；可选挂高限流 Gateway 配置
+# 用法（仓库根目录）：
+#   docker compose -f deploy/docker-compose.yml -f bench/compose/docker-compose.bench.yml \
+#     --env-file .env up -d
+
+services:
+  user-service:
+    ports:
+      - "9001:9001"
+
+  content-service:
+    ports:
+      - "9002:9002"
+
+  social-service:
+    ports:
+      - "9004:9004"
+
+  notify-service:
+    ports:
+      - "9005:9005"
+
+  gateway:
+    entrypoint: ["gateway", "-config", "/etc/gateway/gateway-bench.yaml"]
+    volumes:
+      - ../config/gateway-compose.bench.yaml:/etc/gateway/gateway-bench.yaml:ro

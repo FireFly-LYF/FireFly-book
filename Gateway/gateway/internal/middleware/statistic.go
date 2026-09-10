@@ -10,6 +10,9 @@ import (
 func TrafficStats(rec *redisx.StatsRecorder) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
+		if rec == nil {
+			return
+		}
 		if c.Writer.Status() < 200 || c.Writer.Status() >= 300 {
 			return
 		}

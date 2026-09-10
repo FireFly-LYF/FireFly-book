@@ -119,6 +119,14 @@ coverage.html
 *.prof
 *.pprof
 
+# ----- 压测目录 bench/（原始输出含 JWT；构建产物）-----
+bench/java-gateway/target/
+bench/**/target/
+bench/reports/*.raw/
+bench/reports/*.raw
+bench/reports/*.raw.txt
+bench/reports/*.raw.log
+
 # ----- 压缩包与杂物 -----
 *.zip
 *.tar.gz
