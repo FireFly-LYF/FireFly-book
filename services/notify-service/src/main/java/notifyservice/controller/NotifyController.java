@@ -5,9 +5,10 @@ import notifyservice.dto.CreateNotifyRequest;
 import notifyservice.dto.ReadNotifyRequest;
 import notifyservice.entity.Notification;
 import notifyservice.service.NotifyService;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,15 +21,19 @@ public class NotifyController {
         this.notifyService = notifyService;
     }
 
-    @GetMapping("/list")
-    public ApiResponse<List<Notification>> list(
+    @GetMapping(value = "/list", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<byte[]> list(
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         if (userId == null) {
-            return ApiResponse.fail(40100, "未登录");
+            return ResponseEntity.status(401)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(notifyService.errorResponseJson(40100, "未登录"));
         }
-        return ApiResponse.ok(notifyService.list(userId, page, size));
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(notifyService.listResponseJson(userId, page, size));
     }
 
     @PostMapping("/read")

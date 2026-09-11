@@ -1,12 +1,15 @@
 package notifyservice.service;
 
+import jakarta.annotation.PostConstruct;
 import notifyservice.cache.NotifyListCache;
+import notifyservice.common.ApiResponse;
 import notifyservice.dto.CreateNotifyRequest;
 import notifyservice.dto.ReadNotifyRequest;
 import notifyservice.entity.Notification;
 import notifyservice.mapper.NotificationMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Set;
@@ -18,10 +21,16 @@ public class NotifyService {
 
     private final NotificationMapper notificationMapper;
     private final NotifyListCache notifyListCache;
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     public NotifyService(NotificationMapper notificationMapper, NotifyListCache notifyListCache) {
         this.notificationMapper = notificationMapper;
         this.notifyListCache = notifyListCache;
+    }
+
+    @PostConstruct
+    void bindCacheLoader() {
+        notifyListCache.bindDeepLoader(this::loadPageResponseBytes);
     }
 
     public Notification create(CreateNotifyRequest req) {
@@ -60,21 +69,41 @@ public class NotifyService {
         return notificationMapper.findById(n.getId());
     }
 
-    public List<Notification> list(Long userId, int page, int size) {
-        if (page < 1) page = 1;
-        if (size < 1) size = 20;
-        if (size > 100) size = 100;
-        List<Notification> cached = notifyListCache.get(userId, page, size);
-        if (cached != null) {
-            return cached;
+    public byte[] listResponseJson(Long userId, int page, int size) {
+        if (userId == null) {
+            throw new IllegalArgumentException("未登录");
         }
+        int p = page < 1 ? 1 : page;
+        int s = size < 1 ? 20 : Math.min(size, 100);
+        return notifyListCache.get(userId, p, s);
+    }
+
+    private byte[] loadPageResponseBytes(String cacheKey) {
+        long[] parts = NotifyListCache.parseKey(cacheKey);
+        if (parts == null) {
+            throw new IllegalArgumentException("bad notify cache key: " + cacheKey);
+        }
+        long userId = parts[0];
+        int page = (int) parts[1];
+        int size = (int) parts[2];
         int offset = (page - 1) * size;
         List<Notification> list = notificationMapper.listByUser(userId, size, offset);
         if (list == null) {
             list = List.of();
         }
-        notifyListCache.put(userId, page, size, list);
-        return list;
+        try {
+            return jsonMapper.writeValueAsBytes(ApiResponse.ok(list));
+        } catch (Exception e) {
+            throw new IllegalStateException("serialize notify page failed", e);
+        }
+    }
+
+    public byte[] errorResponseJson(int code, String message) {
+        try {
+            return jsonMapper.writeValueAsBytes(ApiResponse.fail(code, message));
+        } catch (Exception e) {
+            return "{\"code\":50000,\"message\":\"error\",\"data\":null}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        }
     }
 
     public int markRead(Long userId, ReadNotifyRequest req) {
