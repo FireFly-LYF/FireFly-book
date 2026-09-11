@@ -26,10 +26,11 @@ Vite 将 `/api`、`/files` 代理到 Gateway `:8080`。
 | 用户 | 注册/登录 JWT、关注/取关、粉丝与关注列表、他人主页 |
 | 媒体 | 发布页上传封面 |
 | 笔记 | 创建、详情、按用户列表 |
-| 互动 | 点赞/取消、收藏/取消、赞过与收藏列表、评论 |
+| 互动 | 点赞/取消、收藏/取消、赞过与收藏列表、评论楼中楼（含作者昵称头像） |
+| 发布/评论 | `Idempotency-Key` 防重复提交 |
 | 通知 | 通知列表、已读 |
-| 关注流 | `GET /api/feed/following`（feed-service 读扩散） |
-| 搜索 | 笔记/用户搜索 + AI 智能回答（assistant-service） |
+| 关注流 | `GET /api/feed/following`（feed-service 写扩散时间线） |
+| 搜索 | 笔记/用户搜索 + AI 智能回答（引用溯源，需 assistant-service） |
 
 ## 占位中
 
