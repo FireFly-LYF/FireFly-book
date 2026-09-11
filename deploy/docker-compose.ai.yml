@@ -12,6 +12,11 @@ services:
     container_name: ff-nsfw-detector
     ports:
       - "3333:3333"
+    environment:
+      # 镜像内已带 Falconsai 权重；离线避免启动时访问 huggingface.co（国内易 SSL 失败）
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
     restart: unless-stopped
 
   moderation-service:

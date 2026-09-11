@@ -3,6 +3,13 @@ package contentservice.entity;
 import java.time.LocalDateTime;
 
 public class Note {
+    /** 已发布（公开展示 / 可进 Feed·搜索） */
+    public static final int STATUS_PUBLISHED = 1;
+    /** 审核中（先审后发，对外不可见） */
+    public static final int STATUS_PENDING = 2;
+    /** 审核拒绝 */
+    public static final int STATUS_REJECTED = 3;
+
     private Long id;
     private Long userId;
     private String title;
@@ -14,7 +21,14 @@ public class Note {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // 全部 getter/setter
+    public boolean isPublished() {
+        return status != null && status == STATUS_PUBLISHED;
+    }
+
+    public boolean isPending() {
+        return status != null && status == STATUS_PENDING;
+    }
+
     public Long getId() {
         return id;
     }

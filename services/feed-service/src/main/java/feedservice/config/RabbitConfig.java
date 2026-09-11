@@ -74,8 +74,8 @@ public class RabbitConfig {
     }
 
     @Bean
-    public Binding noteCreatedBinding(Queue feedNoteQueue, DirectExchange contentExchange) {
-        return BindingBuilder.bind(feedNoteQueue).to(contentExchange).with(MqConstants.RK_NOTE_CREATED);
+    public Binding notePublishedBinding(Queue feedNoteQueue, DirectExchange contentExchange) {
+        return BindingBuilder.bind(feedNoteQueue).to(contentExchange).with(MqConstants.RK_NOTE_PUBLISHED);
     }
 
     @Bean

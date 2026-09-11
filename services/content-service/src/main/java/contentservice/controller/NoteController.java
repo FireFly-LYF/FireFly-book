@@ -40,10 +40,11 @@ public class NoteController {
     /** 写在 /{id} 前面，避免被当成 id */
     @GetMapping("/user/{userId}")
     public ApiResponse<List<Note>> listByUser(
+            @RequestHeader(value = "X-User-Id", required = false) Long viewerUserId,
             @PathVariable Long userId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.ok(noteService.listByUser(userId, page, size));
+        return ApiResponse.ok(noteService.listByUser(userId, page, size, viewerUserId));
     }
 
     /** Feed 读扩散：一次拉取多位作者最新笔记（userIds≤100） */
@@ -65,13 +66,13 @@ public class NoteController {
         return ApiResponse.ok(noteService.listByIds(req.getIds()));
     }
 
-    @GetMapping("/{id}")
-    public ApiResponse<NoteDetailResponse> getById(@PathVariable Long id) {
-        NoteDetailResponse detail = noteService.findDetail(id);
-        if (detail == null) {
-            return ApiResponse.fail(40401, "笔记不存在");
-        }
-        return ApiResponse.ok(detail);
+    @GetMapping(value = "/{id}", produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    public org.springframework.http.ResponseEntity<byte[]> getById(
+            @RequestHeader(value = "X-User-Id", required = false) Long viewerUserId,
+            @PathVariable Long id) {
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(noteService.detailResponseJson(id, viewerUserId));
     }
 
     @PutMapping("/{id}")

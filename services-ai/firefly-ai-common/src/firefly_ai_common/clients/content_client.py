@@ -20,7 +20,7 @@ class ApiEnvelope(BaseModel):
 
 
 class NoteModerationPatch(BaseModel):
-    """PATCH /api/internal/note/{id}/status 请求体（Java 侧待实现）。"""
+    """PATCH /api/internal/note/{id}/status：1=通过发布，3=拒绝。"""
 
     model_config = ConfigDict(populate_by_name=True)
 

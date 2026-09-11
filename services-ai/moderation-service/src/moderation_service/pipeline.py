@@ -21,7 +21,7 @@ from moderation_service.settings import IMAGE_MODERATION_ENABLED, MAX_IMAGES_PER
 log = logging.getLogger(__name__)
 
 STATUS_APPROVED = 1
-STATUS_REJECTED = 2
+STATUS_REJECTED = 3
 
 
 @dataclass(frozen=True)
@@ -110,29 +110,22 @@ async def process_note_created(
     content: ContentClient,
     media: MediaClient | None = None,
 ) -> ModerationResult:
+    """先审后发：无论通过/拒绝都回写 content；通过后由 Java 发 note.published。"""
     result = await evaluate(event, media=media)
     status = STATUS_APPROVED if result.passed else STATUS_REJECTED
 
-    if not result.passed:
-        try:
-            content.update_moderation_status(
-                event.id,
-                status=status,
-                reason=result.reason,
-            )
-            log.info(
-                "审核拒绝 note_id=%s reason=%s",
-                event.id,
-                result.reason,
-            )
-        except ContentClientError as exc:
-            log.warning(
-                "回写 content 失败 note_id=%s: %s",
-                event.id,
-                exc,
-            )
-    else:
-        log.info("审核通过 note_id=%s", event.id)
+    try:
+        content.update_moderation_status(
+            event.id,
+            status=status,
+            reason=result.reason,
+        )
+        if result.passed:
+            log.info("审核通过并发布 note_id=%s", event.id)
+        else:
+            log.info("审核拒绝 note_id=%s reason=%s", event.id, result.reason)
+    except ContentClientError as exc:
+        raise RetryableMessageError(f"回写 content 失败可重试 note_id={event.id}") from exc
 
     await publisher.publish_note_moderated(
         NoteModeratedEvent(

@@ -24,6 +24,12 @@ public interface NoteMapper {
                           @Param("limit") int limit,
                           @Param("offset") int offset);
 
+    /** 本人主页：已发布 + 审核中（不含拒绝） */
+    @Select("SELECT * FROM note WHERE user_id=#{userId} AND status IN (1, 2) ORDER BY id DESC LIMIT #{limit} OFFSET #{offset}")
+    List<Note> listByOwner(@Param("userId") Long userId,
+                           @Param("limit") int limit,
+                           @Param("offset") int offset);
+
     /**
      * 每位作者取最新 perUser 条（MySQL 8 窗口函数），供 Feed 一次批量拉取。
      */

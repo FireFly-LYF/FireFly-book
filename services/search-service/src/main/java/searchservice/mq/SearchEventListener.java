@@ -36,6 +36,16 @@ public class SearchEventListener {
                 searchIndexService.deleteNote(event.getId());
                 return;
             }
+            // 先审后发：创建事件仅供审核；索引只吃 published/updated
+            if (MqConstants.RK_NOTE_CREATED.equals(routingKey)) {
+                log.debug("忽略未发布 note.created id={}", event.getId());
+                return;
+            }
+            if (!MqConstants.RK_NOTE_PUBLISHED.equals(routingKey)
+                    && !MqConstants.RK_NOTE_UPDATED.equals(routingKey)) {
+                log.debug("忽略笔记事件 routingKey={} id={}", routingKey, event.getId());
+                return;
+            }
             NoteDocument doc = new NoteDocument(
                     event.getId(), event.getUserId(), event.getTitle(), event.getContent(), event.getCoverUrl());
             searchIndexService.indexNote(doc);

@@ -19,6 +19,7 @@ public final class MqConstants {
     public static final String QUEUE_SEARCH_USER_DLQ = "search.user.events.dlq";
 
     public static final String RK_NOTE_CREATED = "note.created";
+    public static final String RK_NOTE_PUBLISHED = "note.published";
     public static final String RK_NOTE_UPDATED = "note.updated";
     public static final String RK_NOTE_DELETED = "note.deleted";
     public static final String RK_USER_UPSERTED = "user.upserted";

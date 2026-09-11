@@ -30,7 +30,8 @@ public class FeedEventListener {
                 feedFanoutService.onNoteDeleted(event.getId());
                 return;
             }
-            if (MqConstants.RK_NOTE_CREATED.equals(routingKey)) {
+            // 先审后发：仅审核通过后的 note.published 写扩散；忽略遗留 note.created 绑定
+            if (MqConstants.RK_NOTE_PUBLISHED.equals(routingKey)) {
                 feedFanoutService.onNoteCreated(event);
             }
         } catch (RuntimeException e) {

@@ -54,7 +54,7 @@ python -m assistant_service.main
 
 | 路径 / 事件 | 说明 | 状态 |
 |-------------|------|------|
-| `note.created` → moderation | content Outbox | 已实现 |
+| `note.created` → moderation（入库审核中） | content Outbox | 已实现；通过后 `note.published` → feed/search |
 | `POST /api/ai/search` | Gateway → assistant-service | 已实现 |
 | 站内检索 | assistant → search-service | 已实现 |
 

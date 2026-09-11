@@ -78,8 +78,8 @@ public class RabbitConfig {
     }
 
     @Bean
-    public Binding noteCreatedBinding(Queue searchNoteQueue, DirectExchange contentExchange) {
-        return BindingBuilder.bind(searchNoteQueue).to(contentExchange).with(MqConstants.RK_NOTE_CREATED);
+    public Binding notePublishedBinding(Queue searchNoteQueue, DirectExchange contentExchange) {
+        return BindingBuilder.bind(searchNoteQueue).to(contentExchange).with(MqConstants.RK_NOTE_PUBLISHED);
     }
 
     @Bean

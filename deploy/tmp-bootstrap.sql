@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS `note` (
   `title`       VARCHAR(128) NOT NULL,
   `content`     TEXT         NOT NULL,
   `cover_url`   VARCHAR(512) DEFAULT NULL,
-  `status`      TINYINT      NOT NULL DEFAULT 1,
+  `status`      TINYINT      NOT NULL DEFAULT 2 COMMENT '1已发布 2审核中 3拒绝',
   `like_count`  INT          NOT NULL DEFAULT 0,
   `idem_key`    VARCHAR(64)  DEFAULT NULL,
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -12,6 +12,7 @@ public final class MqConstants {
     public static final String QUEUE_FEED_FOLLOW_DLQ = "feed.follow.events.dlq";
 
     public static final String RK_NOTE_CREATED = "note.created";
+    public static final String RK_NOTE_PUBLISHED = "note.published";
     public static final String RK_NOTE_DELETED = "note.deleted";
     public static final String RK_FOLLOW_CREATED = "follow.created";
     public static final String RK_FOLLOW_DELETED = "follow.deleted";

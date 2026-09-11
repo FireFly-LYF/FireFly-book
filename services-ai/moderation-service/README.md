@@ -1,15 +1,18 @@
 # moderation-service
 
-消费 `note.created`，**文本规则 + vxlink/nsfw_detector HTTP 审图**，回写 content 并发布 `note.moderated`。
+消费 `note.created`（笔记入库为审核中），**文本规则 + vxlink/nsfw_detector HTTP 审图**，
+回写 content（通过=`status=1` / 拒绝=`status=3`）。通过后由 content 发 `note.published`，
+Feed/Search 再扩散与建索引（先审后发）。
 
 ## 流程
 
 ```text
-note.created
+create note (status=2 审核中) + Outbox note.created
   → evaluate_text（敏感词 / 启发式）
   → MediaClient 拉原图
   → POST http://nsfw-detector:3333/check
-  → PATCH status（拒绝时）+ note.moderated
+  → PATCH status=1|3 + note.moderated
+  →（通过时）content 发 note.published → feed / search
 ```
 
 ## 图片审核

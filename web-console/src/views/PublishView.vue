@@ -52,7 +52,7 @@ async function publish() {
     }
     publishIdemKey.value = null
     form.value = { title: '', content: '', coverUrl: '', accessUrl: '' }
-    emit('toast', '发布成功')
+    emit('toast', '已提交审核，通过后将公开展示')
     emit('published', res.body.data)
   } finally {
     publishing.value = false
@@ -65,7 +65,7 @@ async function publish() {
     <header>
       <strong>发布笔记</strong>
       <button type="button" class="go" :disabled="publishing" @click="publish">
-        {{ publishing ? '发布中…' : '发布' }}
+        {{ publishing ? '提交中…' : '提交审核' }}
       </button>
     </header>
 

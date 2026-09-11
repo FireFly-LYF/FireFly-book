@@ -59,7 +59,7 @@ public class FeedFanoutService {
 
         List<Long> fans = userClient.listFollowerIds(authorId);
         if (fans.isEmpty()) {
-            log.debug("note.created 无粉丝 noteId={} authorId={}", noteId, authorId);
+            log.debug("note.published 无粉丝 noteId={} authorId={}", noteId, authorId);
             return;
         }
         if (fans.size() > maxFanout) {
