@@ -153,6 +153,8 @@ services:
         condition: service_healthy
       content-service:
         condition: service_started
+      user-service:
+        condition: service_started
     restart: unless-stopped
 
   notify-service:

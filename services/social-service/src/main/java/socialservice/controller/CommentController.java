@@ -4,9 +4,9 @@ import socialservice.common.ApiResponse;
 import socialservice.dto.CreateCommentRequest;
 import socialservice.entity.Comment;
 import socialservice.service.CommentService;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/social/comment")
@@ -33,8 +33,20 @@ public class CommentController {
         }
     }
 
-    @GetMapping("/{noteId}")
-    public ApiResponse<List<Comment>> list(@PathVariable Long noteId) {
-        return ApiResponse.ok(commentService.listByNoteId(noteId));
+    @GetMapping(value = "/{noteId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<byte[]> list(
+            @PathVariable Long noteId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            byte[] body = commentService.listResponseJson(noteId, page, size);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(commentService.errorResponseJson(40001, e.getMessage()));
+        }
     }
 }

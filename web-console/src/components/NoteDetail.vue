@@ -20,14 +20,46 @@ const comments = ref([])
 const commentText = ref('')
 const commentIdemKey = ref(null)
 const loading = ref(false)
-const nicknames = ref({})
+/** 正在回复的评论：{ id, nickname }；null=发一级评论 */
+const replyTo = ref(null)
 
 const cover = computed(() => toLocalMediaUrl(detail.value?.coverUrl))
+
+/** 楼中楼：一级 + 挂在其下的二级 */
+const commentThreads = computed(() => {
+  const list = comments.value || []
+  const byId = new Map(list.map((c) => [c.id, c]))
+  const replies = new Map()
+  const roots = []
+  for (const c of list) {
+    if (!c.parentId) {
+      roots.push(c)
+      continue
+    }
+    const rootId = byId.has(c.parentId) ? c.parentId : null
+    if (rootId == null) {
+      roots.push(c)
+      continue
+    }
+    if (!replies.has(rootId)) replies.set(rootId, [])
+    replies.get(rootId).push(c)
+  }
+  return roots.map((root) => ({
+    root,
+    replies: replies.get(root.id) || [],
+  }))
+})
+
+const commentPlaceholder = computed(() =>
+  replyTo.value ? `回复 ${replyTo.value.nickname}…` : '说点什么…',
+)
 
 watch(
   () => [props.open, props.noteId],
   async ([open, id]) => {
     if (!open || !id) return
+    replyTo.value = null
+    commentText.value = ''
     await load(id)
   },
 )
@@ -41,7 +73,6 @@ async function load(id) {
       return
     }
     const data = res.body.data
-    // NoteDetailResponse: { note, mediaUrls }
     detail.value = data?.note
       ? { ...data.note, mediaUrls: data.mediaUrls || [] }
       : data
@@ -78,29 +109,20 @@ async function refreshSocial(id) {
   }
   if (list.body?.code === 0) {
     comments.value = list.body.data || []
-    const ids = comments.value.map((x) => x.userId)
-    await ensureNicks(ids)
   }
 }
 
-async function ensureNicks(ids) {
-  const missing = [...new Set(ids.filter(Boolean))].filter((id) => !nicknames.value[id])
-  await Promise.all(
-    missing.map(async (id) => {
-      const res = await userApi().getById(id)
-      if (res.body?.code === 0) {
-        const u = res.body.data
-        nicknames.value = {
-          ...nicknames.value,
-          [id]: u.nickname || u.username || `用户${id}`,
-        }
-      }
-    }),
-  )
+function commentNick(c) {
+  return c?.nickname || `用户${c?.userId ?? ''}`
 }
 
-function nick(uid) {
-  return nicknames.value[uid] || `用户${uid}`
+function startReply(c) {
+  if (!props.loggedIn) return emit('need-login')
+  replyTo.value = { id: c.id, nickname: commentNick(c) }
+}
+
+function cancelReply() {
+  replyTo.value = null
 }
 
 async function toggleLike() {
@@ -137,11 +159,12 @@ async function sendComment() {
   const res = await socialApi().comment({
     noteId: Number(props.noteId),
     content: text,
-    parentId: null,
+    parentId: replyTo.value?.id ?? null,
   }, commentIdemKey.value)
   if (res.body?.code === 0) {
     commentIdemKey.value = null
     commentText.value = ''
+    replyTo.value = null
     await refreshSocial(props.noteId)
   } else emit('toast', res.body?.message || '评论失败')
 }
@@ -192,25 +215,65 @@ function goAuthor() {
 
           <section class="comments">
             <h3>评论 {{ comments.length }}</h3>
-            <ul v-if="comments.length">
-              <li v-for="c in comments" :key="c.id">
-                <strong>{{ nick(c.userId) }}</strong>
-                <span>{{ c.content }}</span>
-              </li>
-            </ul>
+            <div v-if="commentThreads.length" class="thread-list">
+              <div v-for="t in commentThreads" :key="t.root.id" class="thread">
+                <div class="c-row">
+                  <UserAvatar
+                    :user-id="t.root.userId"
+                    :avatar-url="t.root.avatarUrl || ''"
+                    :name="commentNick(t.root)"
+                    :size="28"
+                  />
+                  <div class="c-body">
+                    <strong>{{ commentNick(t.root) }}</strong>
+                    <span>{{ t.root.content }}</span>
+                    <button type="button" class="reply-btn" @click="startReply(t.root)">回复</button>
+                  </div>
+                </div>
+                <div v-if="t.replies.length" class="replies">
+                  <div v-for="r in t.replies" :key="r.id" class="c-row reply">
+                    <UserAvatar
+                      :user-id="r.userId"
+                      :avatar-url="r.avatarUrl || ''"
+                      :name="commentNick(r)"
+                      :size="24"
+                    />
+                    <div class="c-body">
+                      <strong>{{ commentNick(r) }}</strong>
+                      <span>
+                        <template v-if="r.replyToNickname">
+                          回复 <em>@{{ r.replyToNickname }}</em>：
+                        </template>{{ r.content }}
+                      </span>
+                      <button type="button" class="reply-btn" @click="startReply(r)">回复</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <p v-else class="muted">还没有评论，来抢沙发</p>
           </section>
         </div>
 
         <footer>
-          <input v-model="commentText" placeholder="说点什么…" @keyup.enter="sendComment" />
-          <button type="button" class="act" :class="{ on: liked }" @click="toggleLike">
-            {{ liked ? '♥' : '♡' }} {{ likeCount }}
-          </button>
-          <button type="button" class="act" :class="{ on: collected }" @click="toggleCollect">
-            {{ collected ? '★' : '☆' }}
-          </button>
-          <button type="button" class="send" @click="sendComment">发送</button>
+          <div v-if="replyTo" class="reply-bar">
+            <span>回复 {{ replyTo.nickname }}</span>
+            <button type="button" class="cancel-reply" @click="cancelReply">取消</button>
+          </div>
+          <div class="footer-row">
+            <input
+              v-model="commentText"
+              :placeholder="commentPlaceholder"
+              @keyup.enter="sendComment"
+            />
+            <button type="button" class="act" :class="{ on: liked }" @click="toggleLike">
+              {{ liked ? '♥' : '♡' }} {{ likeCount }}
+            </button>
+            <button type="button" class="act" :class="{ on: collected }" @click="toggleCollect">
+              {{ collected ? '★' : '☆' }}
+            </button>
+            <button type="button" class="send" @click="sendComment">发送</button>
+          </div>
         </footer>
       </div>
     </div>
@@ -361,13 +424,63 @@ h2 {
   font-size: 0.92rem;
 }
 
-.comments li {
+.thread-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.thread {
+  padding: 0.35rem 0 0.55rem;
+  border-bottom: 1px solid #f3f3f3;
+}
+
+.c-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.86rem;
+}
+
+.c-row.reply {
+  margin-top: 0.45rem;
+}
+
+.replies {
+  margin: 0.35rem 0 0 2.1rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 10px;
+  background: #f7f7f8;
+}
+
+.comments .c-body {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  padding: 0.45rem 0;
-  border-bottom: 1px solid #f3f3f3;
-  font-size: 0.86rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.c-body em {
+  font-style: normal;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.reply-btn {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.reply-btn:hover {
+  color: var(--xhs-red);
 }
 
 .muted { color: var(--ink-3); font-size: 0.78rem; }
@@ -375,14 +488,40 @@ h2 {
 
 footer {
   display: flex;
-  gap: 0.4rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.35rem;
   padding: 0.55rem 0.7rem calc(0.55rem + var(--safe-bottom));
   background: #fff;
   border-top: 1px solid var(--line);
 }
 
-footer input {
+.reply-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 10px;
+  background: #f5f5f5;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.cancel-reply {
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.footer-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.footer-row input {
   flex: 1;
   border-radius: 18px;
   background: #f5f5f5;

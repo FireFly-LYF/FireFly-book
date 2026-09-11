@@ -42,6 +42,8 @@ firefly:
     max-per-route: ${HTTP_MAX_PER_ROUTE:20}
   content:
     base-url: ${CONTENT_BASE_URL:http://127.0.0.1:9002}
+  user:
+    base-url: ${USER_BASE_URL:http://127.0.0.1:9001}
 
 mybatis:
   configuration:

@@ -115,10 +115,12 @@ CREATE TABLE IF NOT EXISTS `comment` (
   `note_id`    BIGINT NOT NULL,
   `user_id`    BIGINT NOT NULL,
   `parent_id`  BIGINT DEFAULT NULL,
+  `reply_to_user_id` BIGINT DEFAULT NULL,
   `content`    VARCHAR(512) NOT NULL,
   `idem_key`   VARCHAR(64) DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_note (`note_id`),
+  KEY idx_parent (`parent_id`),
   UNIQUE KEY uk_comment_idem (`user_id`, `idem_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

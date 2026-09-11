@@ -299,8 +299,8 @@ export function socialApi() {
         }),
         body: JSON.stringify(data),
       }),
-    comments: (noteId) =>
-      request(`/api/social/comment/${noteId}`, {
+    comments: (noteId, page = 1, size = 50) =>
+      request(`/api/social/comment/${noteId}?page=${page}&size=${size}`, {
         headers: authHeaders(),
       }),
   }

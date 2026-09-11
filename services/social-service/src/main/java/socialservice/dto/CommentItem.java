@@ -1,16 +1,19 @@
-package socialservice.entity;
+package socialservice.dto;
 
 import java.time.LocalDateTime;
 
-public class Comment {
+/** 评论列表对外字段（不含 idemKey）；含批量补全的用户摘要。 */
+public class CommentItem {
     private Long id;
     private Long noteId;
     private Long userId;
     private Long parentId;
     private Long replyToUserId;
     private String content;
-    private String idemKey;
     private LocalDateTime createdAt;
+    private String nickname;
+    private String avatarUrl;
+    private String replyToNickname;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -24,8 +27,12 @@ public class Comment {
     public void setReplyToUserId(Long replyToUserId) { this.replyToUserId = replyToUserId; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
-    public String getIdemKey() { return idemKey; }
-    public void setIdemKey(String idemKey) { this.idemKey = idemKey; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getNickname() { return nickname; }
+    public void setNickname(String nickname) { this.nickname = nickname; }
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public String getReplyToNickname() { return replyToNickname; }
+    public void setReplyToNickname(String replyToNickname) { this.replyToNickname = replyToNickname; }
 }

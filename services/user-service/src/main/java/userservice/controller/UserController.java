@@ -2,14 +2,18 @@ package userservice.controller;
 
 import userservice.common.ApiResponse;
 import userservice.dto.AuthResponse;
+import userservice.dto.BatchByIdsRequest;
 import userservice.dto.LoginRequest;
 import userservice.dto.RefreshRequest;
 import userservice.dto.RegisterRequest;
 import userservice.dto.UpdateProfileRequest;
+import userservice.dto.UserSummary;
 import userservice.entity.User;
 import userservice.service.AuthTokenService;
 import userservice.service.UserService;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/user")
@@ -94,6 +98,15 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             return ApiResponse.fail(40401, e.getMessage());
         }
+    }
+
+    /** 批量用户摘要（≤100）；写在 /{id} 前避免路由歧义 */
+    @PostMapping("/ids")
+    public ApiResponse<List<UserSummary>> listByIds(@RequestBody BatchByIdsRequest req) {
+        if (req == null || req.getIds() == null || req.getIds().isEmpty()) {
+            return ApiResponse.ok(List.of());
+        }
+        return ApiResponse.ok(userService.findSummariesByIds(req.getIds()));
     }
 
     @GetMapping("/{id}")

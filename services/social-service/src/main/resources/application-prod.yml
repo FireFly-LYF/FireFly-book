@@ -13,3 +13,5 @@ spring:
 firefly:
   content:
     base-url: ${CONTENT_BASE_URL:http://content-service:9002}
+  user:
+    base-url: ${USER_BASE_URL:http://user-service:9001}

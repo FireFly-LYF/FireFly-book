@@ -1,15 +1,22 @@
 package userservice.service;
 
 import userservice.cache.UserProfileCache;
+import userservice.dto.UserSummary;
 import userservice.entity.User;
 import userservice.mapper.UserMapper;
 import userservice.mq.UserIndexEvent;
 import userservice.mq.UserIndexEventPublisher;
+import jakarta.annotation.PostConstruct;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class UserService {
@@ -26,6 +33,17 @@ public class UserService {
         this.userMapper = userMapper;
         this.userIndexEventPublisher = userIndexEventPublisher;
         this.userProfileCache = userProfileCache;
+    }
+
+    @PostConstruct
+    void bindProfileCache() {
+        userProfileCache.bindDbLoader(id -> {
+            User u = userMapper.findById(id);
+            if (u != null) {
+                u.setPassword(null);
+            }
+            return u;
+        });
     }
 
     public User register(String username, String password, String nickname) {
@@ -68,16 +86,70 @@ public class UserService {
     }
 
     public User findById(Long id) {
-        User cached = userProfileCache.get(id);
-        if (cached != null) {
-            return cached;
+        return userProfileCache.get(id);
+    }
+
+    /**
+     * 批量用户摘要：先读单用户缓存，未命中再一次 IN 查询；返回顺序与请求去重后的 id 一致。
+     */
+    public List<UserSummary> findSummariesByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
         }
-        User u = userMapper.findById(id);
-        if (u != null) {
-            u.setPassword(null);
-            userProfileCache.put(u);
+        LinkedHashSet<Long> unique = new LinkedHashSet<>();
+        for (Long id : ids) {
+            if (id != null) {
+                unique.add(id);
+            }
+            if (unique.size() >= 100) {
+                break;
+            }
         }
-        return u;
+        if (unique.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, User> found = new LinkedHashMap<>();
+        List<Long> misses = new ArrayList<>();
+        for (Long id : unique) {
+            User cached = userProfileCache.get(id);
+            if (cached != null) {
+                found.put(id, cached);
+            } else {
+                misses.add(id);
+            }
+        }
+        if (!misses.isEmpty()) {
+            List<User> rows = userMapper.findByIds(misses);
+            if (rows != null) {
+                for (User u : rows) {
+                    if (u == null || u.getId() == null) {
+                        continue;
+                    }
+                    u.setPassword(null);
+                    userProfileCache.put(u);
+                    found.put(u.getId(), u);
+                }
+            }
+        }
+
+        List<UserSummary> out = new ArrayList<>(unique.size());
+        for (Long id : unique) {
+            User u = found.get(id);
+            if (u != null) {
+                out.add(toSummary(u));
+            }
+        }
+        return out;
+    }
+
+    private static UserSummary toSummary(User u) {
+        UserSummary s = new UserSummary();
+        s.setId(u.getId());
+        s.setUsername(u.getUsername());
+        s.setNickname(u.getNickname());
+        s.setAvatarUrl(u.getAvatarUrl());
+        return s;
     }
 
     /** 只覆盖非空字段，不改 username */

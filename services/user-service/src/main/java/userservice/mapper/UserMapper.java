@@ -3,11 +3,26 @@ package userservice.mapper;
 import userservice.entity.User;
 import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
 @Mapper
 public interface UserMapper {
 
     @Select("SELECT * FROM user WHERE id = #{id}")
     User findById(Long id);
+
+    /** 批量摘要（不含 password） */
+    @Select("""
+            <script>
+            SELECT id, username, nickname, avatar_url, bio, created_at, updated_at
+            FROM user
+            WHERE id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+              #{id}
+            </foreach>
+            </script>
+            """)
+    List<User> findByIds(@Param("ids") List<Long> ids);
 
     /** 登录 / 注册查重 */
     @Select("SELECT * FROM user WHERE username = #{username}")
