@@ -42,8 +42,11 @@ class SearchData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     answer: str
+    # 仅含服务端核对后的实引子集（非全部候选）
     note_sources: list[NoteSource] = Field(default_factory=list, alias="noteSources")
     web_sources: list[WebSource] = Field(default_factory=list, alias="webSources")
+    # 本次无检索材料，回答为常识/模型补充
+    ungrounded: bool = False
 
 
 class ApiResponse(BaseModel):

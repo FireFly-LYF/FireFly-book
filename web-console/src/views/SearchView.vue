@@ -26,6 +26,7 @@ const aiStreaming = ref(false)
 const aiAnswer = ref('')
 const aiNoteSources = ref([])
 const aiWebSources = ref([])
+const aiUngrounded = ref(false)
 const aiError = ref('')
 let aiAbort = null
 
@@ -93,6 +94,7 @@ async function doSearch() {
   aiAnswer.value = ''
   aiNoteSources.value = []
   aiWebSources.value = []
+  aiUngrounded.value = false
   aiError.value = ''
   try {
     const notesPromise = searchApi().notes(keyword, 1, 20)
@@ -105,8 +107,10 @@ async function doSearch() {
           onMeta: (data) => {
             aiLoading.value = false
             aiStreaming.value = true
-            aiNoteSources.value = data.noteSources || []
-            aiWebSources.value = data.webSources || []
+            // 实引在 done 里下发；此处仅提前标记是否无检索材料
+            if (typeof data?.ungrounded === 'boolean') {
+              aiUngrounded.value = data.ungrounded
+            }
           },
           onDelta: (text) => {
             if (!text) return
@@ -117,6 +121,9 @@ async function doSearch() {
           onDone: (data) => {
             aiStreaming.value = false
             if (data?.answer) aiAnswer.value = data.answer
+            aiNoteSources.value = data?.noteSources || []
+            aiWebSources.value = data?.webSources || []
+            aiUngrounded.value = !!data?.ungrounded
           },
           onError: (msg) => {
             aiStreaming.value = false
@@ -178,6 +185,7 @@ function clearQuery() {
   aiAnswer.value = ''
   aiNoteSources.value = []
   aiWebSources.value = []
+  aiUngrounded.value = false
   aiError.value = ''
   aiStreaming.value = false
   nextTick(() => inputRef.value?.focus())
@@ -201,10 +209,21 @@ function escapeHtml(text) {
     .replace(/"/g, '&quot;')
 }
 
-/** 轻量 Markdown → HTML（加粗、列表、段落） */
+const UNGROUNDED_PREFIX = '未检索到依据，以下是AI补充结果'
+
+/** 流式过程中隐藏尚未结束的 usedSources 行；有独立横幅时去掉正文前缀避免重复 */
+function prepareAiDisplayText(text, stripPrefix) {
+  let t = String(text || '').replace(/^\s*usedSources\s*:\s*\[[^\]]*\]\s*$/gim, '')
+  if (stripPrefix) {
+    t = t.replace(new RegExp(`^${UNGROUNDED_PREFIX}\\s*`), '')
+  }
+  return t.trim()
+}
+
+/** 轻量 Markdown → HTML（加粗、列表、段落）；高亮 [笔记N]/[网络M] */
 function formatAiAnswer(text) {
   if (!text) return ''
-  const lines = String(text).trim().split('\n')
+  const lines = text.split('\n')
   let html = ''
   let inList = false
 
@@ -215,6 +234,14 @@ function formatAiAnswer(text) {
     }
   }
 
+  const inline = (s) =>
+    escapeHtml(s)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(
+        /\[(笔记|网络)(\d+)\]/g,
+        '<span class="ai-cite">[$1$2]</span>',
+      )
+
   for (const raw of lines) {
     const line = raw.trimEnd()
     const bullet = line.match(/^[-*•]\s+(.+)/)
@@ -223,19 +250,23 @@ function formatAiAnswer(text) {
         html += '<ul>'
         inList = true
       }
-      html += `<li>${escapeHtml(bullet[1]).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</li>`
+      html += `<li>${inline(bullet[1])}</li>`
       continue
     }
     flushList()
     if (!line.trim()) continue
-    const body = escapeHtml(line).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    html += `<p>${body}</p>`
+    html += `<p>${inline(line)}</p>`
   }
   flushList()
   return html
 }
 
-const aiAnswerHtml = computed(() => formatAiAnswer(aiAnswer.value))
+const aiAnswerDisplay = computed(() =>
+  prepareAiDisplayText(aiAnswer.value, aiUngrounded.value),
+)
+const aiAnswerHtml = computed(() =>
+  formatAiAnswer(prepareAiDisplayText(aiAnswer.value, aiUngrounded.value)),
+)
 </script>
 
 <template>
@@ -286,12 +317,13 @@ const aiAnswerHtml = computed(() => formatAiAnswer(aiAnswer.value))
         </div>
         <p v-else-if="aiError" class="ai-error pad-sm">{{ aiError }}</p>
         <div v-else-if="aiAnswer || aiStreaming" class="ai-body pad-sm">
+          <p v-if="aiUngrounded" class="ai-ungrounded">未检索到依据，以下是AI补充结果</p>
           <div v-if="aiStreaming" class="ai-answer ai-streaming">
-            {{ aiAnswer }}<span class="ai-cursor" aria-hidden="true" />
+            {{ aiAnswerDisplay }}<span class="ai-cursor" aria-hidden="true" />
           </div>
           <div v-else class="ai-answer" v-html="aiAnswerHtml" />
           <div v-if="!aiStreaming && aiNoteSources.length" class="ai-ref-notes">
-            <span class="ai-ref-label">参考笔记</span>
+            <span class="ai-ref-label">引用笔记</span>
             <button
               v-for="n in aiNoteSources"
               :key="n.id"
@@ -303,8 +335,8 @@ const aiAnswerHtml = computed(() => formatAiAnswer(aiAnswer.value))
             </button>
           </div>
         </div>
-        <div v-if="!aiLoading && aiWebSources.length" class="ai-sources pad-sm">
-          <h4>网络参考</h4>
+        <div v-if="!aiLoading && !aiStreaming && aiWebSources.length" class="ai-sources pad-sm">
+          <h4>引用网页</h4>
           <ul>
             <li v-for="(w, i) in aiWebSources" :key="i">
               <a :href="w.url" target="_blank" rel="noopener noreferrer">{{ w.title }}</a>
@@ -538,6 +570,27 @@ h3 {
 
 .ai-body {
   padding-bottom: 0.85rem;
+}
+
+.ai-ungrounded {
+  margin: 0 0 0.55rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brand, #ff2442) 10%, transparent);
+  color: var(--brand, #ff2442);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.ai-answer :deep(.ai-cite) {
+  display: inline-block;
+  margin: 0 0.1rem;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--brand, #ff2442) 12%, transparent);
+  color: var(--brand, #ff2442);
+  font-size: 0.85em;
+  font-weight: 600;
 }
 
 .ai-ref-notes {

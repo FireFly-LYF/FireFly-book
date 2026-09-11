@@ -1,6 +1,6 @@
 """搜索问答 workflow。
 
-步骤：准备材料（笔记 + 可选网络）→ 调 LLM → 一次性返回或 SSE 推流。
+步骤：准备材料（笔记 + 可选网络）→ 调 LLM → 解析/核对引用 → 一次性返回或 SSE 推流。
 """
 
 from __future__ import annotations
@@ -11,15 +11,16 @@ import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
+from assistant_service.agent.citations import auto_cite_all, resolve_citations
+from assistant_service.agent.llm import clean_answer, generate_answer, iter_answer_chunks
+from assistant_service.agent.sync_stream import stream_sync_in_thread
 from assistant_service.schemas.search import NoteSource, SearchData, SearchRequest, WebSource
 from assistant_service.settings import AssistantSettings, load_assistant_settings
-from assistant_service.agent.llm import clean_answer, generate_answer, iter_answer_chunks
 from assistant_service.tools.notes import (
     fetch_note_sources,
     note_sources_from_candidates,
     notes_for_llm,
 )
-from assistant_service.agent.sync_stream import stream_sync_in_thread
 from assistant_service.tools.web_search import search_web, web_for_llm
 
 log = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class SearchContext:
     note_sources: list[NoteSource]
     web_sources: list[WebSource]
     cfg: AssistantSettings
+    has_llm: bool
 
 
 def _web_block_for(include_web: bool, web_sources: list[WebSource]) -> str:
@@ -44,6 +46,26 @@ def _web_block_for(include_web: bool, web_sources: list[WebSource]) -> str:
     if not web_sources:
         return WEB_EMPTY
     return web_for_llm(web_sources)
+
+
+def _finalize(
+    raw_answer: str,
+    *,
+    note_candidates: list[NoteSource],
+    web_candidates: list[WebSource],
+    use_auto_cite: bool,
+) -> SearchData:
+    cleaned = clean_answer(raw_answer)
+    if use_auto_cite:
+        cited = auto_cite_all(cleaned, note_candidates, web_candidates)
+    else:
+        cited = resolve_citations(cleaned, note_candidates, web_candidates)
+    return SearchData(
+        answer=cited.answer,
+        note_sources=cited.note_sources,
+        web_sources=cited.web_sources,
+        ungrounded=cited.ungrounded,
+    )
 
 
 async def _prepare_search_context(req: SearchRequest) -> SearchContext:
@@ -84,11 +106,12 @@ async def _prepare_search_context(req: SearchRequest) -> SearchContext:
         note_sources=note_sources,
         web_sources=web_sources if req.include_web else [],
         cfg=cfg,
+        has_llm=bool(cfg.llm_api_key),
     )
 
 
 async def run_search(req: SearchRequest) -> SearchData:
-    """同步 workflow：准备材料 → LLM → 完整答案。"""
+    """同步 workflow：准备材料 → LLM → 核对引用 → 完整答案。"""
     t0 = time.perf_counter()
     ctx = await _prepare_search_context(req)
 
@@ -99,30 +122,36 @@ async def run_search(req: SearchRequest) -> SearchData:
         ctx.web_block,
         settings=ctx.cfg,
     )
+    data = _finalize(
+        answer,
+        note_candidates=ctx.note_sources,
+        web_candidates=ctx.web_sources,
+        use_auto_cite=not ctx.has_llm,
+    )
     log.info(
-        "search_answer 完成 query=%s notes=%d web=%d total=%.2fs",
+        "search_answer 完成 query=%s notes=%d web=%d cited_notes=%d cited_web=%d "
+        "ungrounded=%s total=%.2fs",
         ctx.query[:30],
         len(ctx.note_sources),
         len(ctx.web_sources),
+        len(data.note_sources),
+        len(data.web_sources),
+        data.ungrounded,
         time.perf_counter() - t0,
     )
-    return SearchData(
-        answer=answer,
-        note_sources=ctx.note_sources,
-        web_sources=ctx.web_sources,
-    )
+    return data
 
 
 async def run_search_stream(req: SearchRequest) -> AsyncIterator[dict]:
-    """流式 workflow：meta → delta* → done。"""
+    """流式 workflow：meta → delta* → done（done 含核对后的实引）。"""
     t0 = time.perf_counter()
     ctx = await _prepare_search_context(req)
 
+    # meta 不暴露全部候选，避免前端把「检索到」当成「用过」
     yield {
         "event": "meta",
         "data": {
-            "noteSources": [n.model_dump(by_alias=True) for n in ctx.note_sources],
-            "webSources": [w.model_dump(by_alias=True) for w in ctx.web_sources],
+            "ungrounded": not (ctx.note_sources or ctx.web_sources),
         },
     }
 
@@ -138,12 +167,30 @@ async def run_search_stream(req: SearchRequest) -> AsyncIterator[dict]:
         parts.append(chunk)
         yield {"event": "delta", "data": {"text": chunk}}
 
-    answer = clean_answer("".join(parts))
+    raw = "".join(parts)
+    data = _finalize(
+        raw,
+        note_candidates=ctx.note_sources,
+        web_candidates=ctx.web_sources,
+        use_auto_cite=not ctx.has_llm,
+    )
     log.info(
-        "search_answer(stream) 完成 query=%s notes=%d chunks=%d total=%.2fs",
+        "search_answer(stream) 完成 query=%s notes=%d chunks=%d cited_notes=%d "
+        "cited_web=%d ungrounded=%s total=%.2fs",
         ctx.query[:30],
         len(ctx.note_sources),
         len(parts),
+        len(data.note_sources),
+        len(data.web_sources),
+        data.ungrounded,
         time.perf_counter() - t0,
     )
-    yield {"event": "done", "data": {"answer": answer}}
+    yield {
+        "event": "done",
+        "data": {
+            "answer": data.answer,
+            "noteSources": [n.model_dump(by_alias=True) for n in data.note_sources],
+            "webSources": [w.model_dump(by_alias=True) for w in data.web_sources],
+            "ungrounded": data.ungrounded,
+        },
+    }

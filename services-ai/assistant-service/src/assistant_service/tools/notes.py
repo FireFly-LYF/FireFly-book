@@ -128,8 +128,9 @@ def notes_for_llm(notes: list[NoteSource]) -> str:
     if not notes:
         return "（无相关站内笔记）"
     lines: list[str] = []
-    for n in notes:
+    for i, n in enumerate(notes, 1):
         title = n.title or "无标题"
         body = n.snippet or ""
-        lines.append(f"[笔记#{n.id}] {title}\n{body}")
+        # 固定标号 [笔记N]，供模型引用；id 仅作辅助，核对只认标号
+        lines.append(f"[笔记{i}] （站内笔记 id={n.id}）{title}\n{body}")
     return "\n\n".join(lines)
