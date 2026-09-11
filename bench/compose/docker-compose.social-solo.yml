@@ -1,0 +1,7 @@
+# 单服务压测：仅抬高 social HMAC skew，便于 wrk 静态签名撑满 60s
+services:
+  social-service:
+    environment:
+      FIREFLY_INTERNAL_AUTH_SKEW_SEC: "600"
+    ports:
+      - "9004:9004"

@@ -1,0 +1,55 @@
+{
+  "mode": "local-online-http",
+  "note": "no Docker; HTTP multipart /check like moderation-service",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+  "model": "Falconsai/nsfw_image_detection",
+  "input_size": 224,
+  "batch_size": 1,
+  "tensorrt_onnx": false,
+  "image": "D:\\A_Software\\Java\\SAVE\\FireFly-book\\web-console\\tmp-covers\\cat.jpg",
+  "image_bytes": 91230,
+  "model_load_ms": 74910.7,
+  "n": 100,
+  "warmup": 10,
+  "url": "http://127.0.0.1:13333/check",
+  "by_concurrency": {
+    "1": {
+      "ok": 100,
+      "avg_ms": 35.237,
+      "min_ms": 20.786,
+      "p50_ms": 33.588,
+      "p90_ms": 46.736,
+      "p95_ms": 47.494,
+      "p99_ms": 62.284,
+      "max_ms": 64.813,
+      "qps": 28.31,
+      "fail": 0,
+      "concurrency": 1
+    },
+    "2": {
+      "ok": 100,
+      "avg_ms": 36.156,
+      "min_ms": 21.354,
+      "p50_ms": 34.59,
+      "p90_ms": 49.796,
+      "p95_ms": 55.03,
+      "p99_ms": 59.355,
+      "max_ms": 64.333,
+      "qps": 54.83,
+      "fail": 0,
+      "concurrency": 2
+    }
+  },
+  "inprocess_e2e": {
+    "ok": 50,
+    "avg_ms": 19.67,
+    "min_ms": 18.198,
+    "p50_ms": 19.63,
+    "p90_ms": 20.747,
+    "p95_ms": 20.893,
+    "p99_ms": 21.357,
+    "max_ms": 21.402,
+    "qps": 50.84
+  }
+}

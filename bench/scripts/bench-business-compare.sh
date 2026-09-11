@@ -63,7 +63,7 @@ smoke() {
   curl -sS -o /dev/null -w "  user %{http_code}\n" -H "Authorization: Bearer ${TOKEN}" "${base}/api/user/${USER_ID}" || true
   curl -sS -o /dev/null -w "  note %{http_code}\n" -H "Authorization: Bearer ${TOKEN}" "${base}/api/note/${NOTE_ID}" || true
   curl -sS -o /dev/null -w "  likeCount %{http_code}\n" -H "Authorization: Bearer ${TOKEN}" "${base}/api/social/like/${NOTE_ID}/count" || true
-  curl -sS -o /dev/null -w "  comments %{http_code}\n" -H "Authorization: Bearer ${TOKEN}" "${base}/api/social/comment/${NOTE_ID}" || true
+  curl -sS -o /dev/null -w "  comments %{http_code}\n" -H "Authorization: Bearer ${TOKEN}" "${base}/api/social/comment/${NOTE_ID}?page=1&size=20" || true
   curl -sS -o /dev/null -w "  notify %{http_code}\n" -H "Authorization: Bearer ${TOKEN}" "${base}/api/notify/list?page=1&size=20" || true
 }
 
@@ -94,7 +94,7 @@ smoke "${JAVA_BASE}" "Java"
 pair "读用户资料 GET /api/user/{id}" "/api/user/${USER_ID}" "Go"
 pair "读笔记详情 GET /api/note/{id}" "/api/note/${NOTE_ID}" "Java"
 pair "赞数 GET /api/social/like/{id}/count" "/api/social/like/${NOTE_ID}/count" "Go"
-pair "评论列表 GET /api/social/comment/{id}" "/api/social/comment/${NOTE_ID}" "Java"
+pair "评论列表 GET /api/social/comment/{id}" "/api/social/comment/${NOTE_ID}?page=1&size=20" "Java"
 pair "通知列表 GET /api/notify/list" "/api/notify/list?page=1&size=20" "Go"
 
 echo

@@ -1,0 +1,14 @@
+# A/B：通过 FIREFLY_CACHE_L1_ENABLED 开关进程内 L1（默认 true）
+services:
+  user-service:
+    environment:
+      FIREFLY_CACHE_L1_ENABLED: ${FIREFLY_CACHE_L1_ENABLED:-true}
+  content-service:
+    environment:
+      FIREFLY_CACHE_L1_ENABLED: ${FIREFLY_CACHE_L1_ENABLED:-true}
+  social-service:
+    environment:
+      FIREFLY_CACHE_L1_ENABLED: ${FIREFLY_CACHE_L1_ENABLED:-true}
+  notify-service:
+    environment:
+      FIREFLY_CACHE_L1_ENABLED: ${FIREFLY_CACHE_L1_ENABLED:-true}

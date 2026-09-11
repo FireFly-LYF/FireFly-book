@@ -127,6 +127,8 @@ bench/reports/*.raw
 bench/reports/*.raw.txt
 bench/reports/*.raw.log
 bench/reports/*.raw.csv
+bench/reports/*.console.txt
+bench/reports/*.console.log
 
 # ----- 本地缓存（HF 模型权重、工具下载等，勿入库）-----
 .cache/
