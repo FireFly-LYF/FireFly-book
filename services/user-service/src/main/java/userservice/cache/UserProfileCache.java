@@ -17,7 +17,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
- * 用户资料：L1 Caffeine（refreshAfterWrite）+ L2 Redis {@code user:info:{id}}。
+ * 用户资料：L1 Caffeine（refreshAfterWrite）+ L2 Redis {@code user:info:{id}}（实体 JSON，非整包 HTTP 预序列化）。
+ * {@code firefly.cache.l1-enabled=false} 时仅关 L1，仍走 Redis L2。
  */
 @Component
 public class UserProfileCache {
@@ -53,7 +54,7 @@ public class UserProfileCache {
                 .expireAfterWrite(EXPIRE_AFTER)
                 .executor(refreshExecutor)
                 .build(this::load);
-        log.info("UserProfileCache L1={}", l1Enabled);
+        log.info("UserProfileCache L1={} (false=L1 off, Redis L2 still on)", l1Enabled);
     }
 
     public void bindDbLoader(Function<Long, User> loader) {
@@ -64,6 +65,7 @@ public class UserProfileCache {
         if (id == null) {
             return null;
         }
+        // 关 L1：仍走 Redis L2（实体缓存）；开 L1：Caffeine → Redis → DB
         User u = l1Enabled ? local.get(id) : load(id);
         return u == ABSENT ? null : u;
     }
@@ -95,6 +97,7 @@ public class UserProfileCache {
         }
     }
 
+    /** Redis L2 → DB；供关 L1 与 Caffeine loader 共用。 */
     private User load(Long id) {
         try {
             String json = redis.opsForValue().get(key(id));

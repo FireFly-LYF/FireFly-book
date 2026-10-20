@@ -37,6 +37,11 @@ public class FeedService {
         this.timelineCache = timelineCache;
     }
 
+    /** 发现流：全站最新已发布笔记（新账号无需关注即可浏览） */
+    public List<FeedItem> discoverFeed(int size) {
+        return contentClient.listDiscover(size);
+    }
+
     public List<FeedItem> followingFeed(Long userId, int size) {
         int limit = size <= 0 ? 20 : Math.min(size, 50);
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { toLocalMediaUrl } from '../api'
 import UserAvatar from './UserAvatar.vue'
 import SignedImg from './SignedImg.vue'
@@ -15,6 +15,14 @@ const props = defineProps({
 const emit = defineEmits(['open', 'open-profile'])
 
 const cover = computed(() => toLocalMediaUrl(props.note.coverUrl))
+const coverFailed = ref(false)
+watch(
+  () => props.note?.coverUrl,
+  () => {
+    coverFailed.value = false
+  },
+)
+const showCoverImg = computed(() => cover.value && !coverFailed.value)
 const title = computed(() => props.note.title || props.note.content || '无标题笔记')
 /** 无封面时展示短标题艺术字，避免红色单字占位 */
 const artText = computed(() => {
@@ -31,8 +39,14 @@ function onAuthorClick(e) {
 
 <template>
   <article class="card" @click="$emit('open', note)">
-    <div class="cover" :class="{ empty: !cover }">
-      <SignedImg v-if="cover" :src="cover" :alt="title" loading="lazy" />
+    <div class="cover" :class="{ empty: !showCoverImg }">
+      <SignedImg
+        v-if="showCoverImg"
+        :src="cover"
+        :alt="title"
+        loading="lazy"
+        @error="coverFailed = true"
+      />
       <div v-else class="cover-ph">
         <span class="art">{{ artText }}</span>
       </div>
@@ -75,10 +89,12 @@ function onAuthorClick(e) {
   min-height: 120px;
 }
 
-.cover img {
+.cover :deep(img) {
+  display: block;
   width: 100%;
   height: auto;
   vertical-align: middle;
+  object-fit: cover;
 }
 
 .cover-ph {

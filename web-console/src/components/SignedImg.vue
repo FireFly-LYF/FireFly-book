@@ -1,6 +1,12 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { isSignedMediaPath, resolveSignedMediaUrl, toLocalMediaUrl } from '../api'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  getAuthEpoch,
+  isSignedMediaPath,
+  onAuthChange,
+  resolveSignedMediaUrl,
+  toLocalMediaUrl,
+} from '../api'
 
 const props = defineProps({
   src: { type: String, default: '' },
@@ -10,10 +16,23 @@ const props = defineProps({
 
 const resolved = ref('')
 const failed = ref(false)
+const authEpoch = ref(getAuthEpoch())
+
+const emit = defineEmits(['error', 'load'])
+
+let offAuth = null
+onMounted(() => {
+  offAuth = onAuthChange((epoch) => {
+    authEpoch.value = epoch
+  })
+})
+onUnmounted(() => {
+  if (offAuth) offAuth()
+})
 
 watch(
-  () => props.src,
-  async (raw) => {
+  () => [props.src, authEpoch.value],
+  async ([raw]) => {
     failed.value = false
     resolved.value = ''
     if (!raw) return
@@ -27,10 +46,16 @@ watch(
     } catch {
       failed.value = true
       resolved.value = ''
+      emit('error')
     }
   },
   { immediate: true },
 )
+
+function onImgError() {
+  failed.value = true
+  emit('error')
+}
 </script>
 
 <template>
@@ -39,6 +64,7 @@ watch(
     :src="resolved"
     :alt="alt"
     :loading="loading"
-    @error="failed = true"
+    @error="onImgError"
+    @load="emit('load')"
   />
 </template>

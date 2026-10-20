@@ -30,4 +30,10 @@ public class FeedController {
         }
         return ApiResponse.ok(feedService.followingFeed(userId, size));
     }
+
+    /** 发现流：全站最新笔记（可不登录） */
+    @GetMapping("/discover")
+    public ApiResponse<List<FeedItem>> discover(@RequestParam(defaultValue = "40") int size) {
+        return ApiResponse.ok(feedService.discoverFeed(size));
+    }
 }

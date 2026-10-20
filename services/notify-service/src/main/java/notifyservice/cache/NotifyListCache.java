@@ -19,6 +19,7 @@ import java.util.function.Function;
 /**
  * 通知分页整包响应：{@code notify:inbox:resp:{userId}:{page}:{size}}。
  * L1 Caffeine（refreshAfterWrite）+ L2 Redis，存 ApiResponse JSON 字节。
+ * {@code firefly.cache.l1-enabled=false} 时关 L1，且关 Redis 整包响应字节预序列化，每次 deepLoader。
  */
 @Component
 public class NotifyListCache {
@@ -49,7 +50,7 @@ public class NotifyListCache {
                 .expireAfterWrite(EXPIRE_AFTER)
                 .executor(refreshExecutor)
                 .build(this::load);
-        log.info("NotifyListCache L1={}", l1Enabled);
+        log.info("NotifyListCache L1={} (false=L1 off + Redis response-bytes off)", l1Enabled);
     }
 
     public void bindDeepLoader(Function<String, byte[]> loader) {
@@ -62,7 +63,7 @@ public class NotifyListCache {
         }
         String k = key(userId, page, size);
         if (!l1Enabled) {
-            return load(k);
+            return loadDeep(k);
         }
         return local.get(k);
     }
@@ -94,6 +95,12 @@ public class NotifyListCache {
         if (fromRedis != null) {
             return fromRedis;
         }
+        byte[] built = loadDeep(cacheKey);
+        writeRedis(cacheKey, built);
+        return built;
+    }
+
+    private byte[] loadDeep(String cacheKey) {
         Function<String, byte[]> loader = deepLoader.get();
         if (loader == null) {
             throw new IllegalStateException("notify cache deep loader unset");
@@ -102,7 +109,6 @@ public class NotifyListCache {
         if (built == null) {
             throw new IllegalStateException("notify cache deep loader returned null");
         }
-        writeRedis(cacheKey, built);
         return built;
     }
 

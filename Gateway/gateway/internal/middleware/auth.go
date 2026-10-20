@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"path"
+	"strings"
+
 	"gateway/internal/auth"
 	"gateway/internal/tenant"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,28 +25,41 @@ func OptionalJWTAuth(secret []byte) gin.HandlerFunc {
 }
 
 // JWTAuthExcept 强制 JWT，但 skip 中的「METHOD path」放行（如 POST /api/user/login）。
+// path 支持 path.Match 通配（单段 *），例如 GET /api/note/* 。
+// 命中 skip 时仍尝试解析 Bearer（可选鉴权），以便登录用户保留 X-User-Id。
 func JWTAuthExcept(secret []byte, skip map[string]struct{}) gin.HandlerFunc {
 	return jwtAuth(secret, true, skip, "")
 }
 
+func matchPublicAPI(skip map[string]struct{}, method, reqPath string) bool {
+	if skip == nil {
+		return false
+	}
+	for pattern := range skip {
+		m, p, ok := strings.Cut(pattern, " ")
+		if !ok || !strings.EqualFold(m, method) {
+			continue
+		}
+		if p == reqPath {
+			return true
+		}
+		if matched, err := path.Match(p, reqPath); err == nil && matched {
+			return true
+		}
+	}
+	return false
+}
+
 func jwtAuth(secret []byte, required bool, skip map[string]struct{}, requireTyp string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if skip != nil {
-			key := c.Request.Method + " " + c.Request.URL.Path
-			if _, ok := skip[key]; ok {
-				c.Next()
-				return
-			}
-			// Gin group /api 下 path 仍是完整路径
-			if _, ok := skip[strings.ToUpper(c.Request.Method)+" "+c.Request.URL.Path]; ok {
-				c.Next()
-				return
-			}
+		needAuth := required
+		if matchPublicAPI(skip, c.Request.Method, c.Request.URL.Path) {
+			needAuth = false
 		}
 
 		tokenStr, ok := auth.ExtractBearer(c)
 		if !ok {
-			if required {
+			if needAuth {
 				c.JSON(401, gin.H{"code": 401, "msg": "missing token"})
 				c.Abort()
 				return

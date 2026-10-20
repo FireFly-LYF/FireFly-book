@@ -59,6 +59,7 @@ tmp-covers/
 *.pid
 *.bak
 *.tmp
+.firefly-dev/
 
 # ----- Java / Maven / Gradle（所有微服务） -----
 **/target/

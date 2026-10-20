@@ -32,6 +32,18 @@ let aiAbort = null
 
 const showIdle = computed(() => !searched.value && !loading.value)
 
+/** AI 不可用（503 / 无 upstream 等）时整块隐藏，不展示错误态板块 */
+const showAiBlock = computed(() => {
+  if (aiError.value) return false
+  return (
+    aiLoading.value ||
+    aiStreaming.value ||
+    !!aiAnswer.value ||
+    aiNoteSources.value.length > 0 ||
+    aiWebSources.value.length > 0
+  )
+})
+
 onMounted(() => {
   history.value = loadHistory()
   nextTick(() => inputRef.value?.focus())
@@ -127,13 +139,17 @@ async function doSearch() {
           },
           onError: (msg) => {
             aiStreaming.value = false
-            aiError.value = msg || 'AI 回答暂不可用（请确认 assistant-service）'
+            aiAnswer.value = ''
+            aiNoteSources.value = []
+            aiWebSources.value = []
+            aiError.value = msg || 'AI 回答暂不可用'
           },
         },
         signal,
       )
       if (res?.status === 401) throw new Error('401')
-      if (aiError.value) throw new Error(aiError.value)
+      // AI 失败只静默隐藏板块，不影响笔记/用户搜索结果
+      if (aiError.value) return
     }
     const aiPromise = runAiStream()
 
@@ -306,7 +322,7 @@ const aiAnswerHtml = computed(() =>
     </template>
 
     <template v-else>
-      <section class="ai-block">
+      <section v-if="showAiBlock" class="ai-block">
         <div class="ai-hd">
           <span class="ai-badge">AI</span>
           <h3>智能回答</h3>
@@ -315,7 +331,6 @@ const aiAnswerHtml = computed(() =>
           <span class="ai-dot" /><span class="ai-dot" /><span class="ai-dot" />
           <span class="ai-loading-text">正在思考…</span>
         </div>
-        <p v-else-if="aiError" class="ai-error pad-sm">{{ aiError }}</p>
         <div v-else-if="aiAnswer || aiStreaming" class="ai-body pad-sm">
           <p v-if="aiUngrounded" class="ai-ungrounded">未检索到依据，以下是AI补充结果</p>
           <div v-if="aiStreaming" class="ai-answer ai-streaming">

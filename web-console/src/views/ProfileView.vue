@@ -527,7 +527,17 @@ const displayName = computed(
     border-bottom: 1px solid var(--line);
     margin-bottom: 8px;
   }
-  .notes-wrap, .people { max-width: 1440px; margin: 0 auto; }
+  .notes-wrap,
+  .people {
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  /* 与白框同宽后，按容器宽度用 3 列，避免沿用全屏 4/5 列显得过窄 */
+  .notes-wrap .xhs-waterfall {
+    column-count: 3;
+    column-gap: 14px;
+  }
 }
 
 .brand {

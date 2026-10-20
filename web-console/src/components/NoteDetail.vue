@@ -23,7 +23,21 @@ const loading = ref(false)
 /** 正在回复的评论：{ id, nickname }；null=发一级评论 */
 const replyTo = ref(null)
 
-const cover = computed(() => toLocalMediaUrl(detail.value?.coverUrl))
+const mediaList = computed(() => {
+  const d = detail.value
+  if (!d) return []
+  const raw = Array.isArray(d.mediaUrls) && d.mediaUrls.length
+    ? d.mediaUrls
+    : d.coverUrl
+      ? [d.coverUrl]
+      : []
+  return raw.map((u) => toLocalMediaUrl(u)).filter(Boolean)
+})
+
+const mediaIndex = ref(0)
+const activeMedia = computed(
+  () => mediaList.value[mediaIndex.value] || mediaList.value[0] || '',
+)
 
 /** 楼中楼：一级 + 挂在其下的二级 */
 const commentThreads = computed(() => {
@@ -55,11 +69,12 @@ const commentPlaceholder = computed(() =>
 )
 
 watch(
-  () => [props.open, props.noteId],
+  () => [props.open, props.noteId, props.loggedIn],
   async ([open, id]) => {
     if (!open || !id) return
     replyTo.value = null
     commentText.value = ''
+    mediaIndex.value = 0
     await load(id)
   },
 )
@@ -178,9 +193,28 @@ function goAuthor() {
 <template>
   <div v-if="open" class="mask" @click.self="$emit('close')">
     <div class="panel">
-      <div class="cover" :class="{ empty: !cover }">
-        <SignedImg v-if="cover" :src="cover" alt="" />
+      <div class="cover" :class="{ empty: !activeMedia }">
+        <SignedImg v-if="activeMedia" :src="activeMedia" alt="" />
         <div v-else class="cover-ph">{{ (detail?.title || '笔记').slice(0, 1) }}</div>
+        <div v-if="mediaList.length > 1" class="media-nav">
+          <button
+            type="button"
+            class="nav-btn"
+            :disabled="mediaIndex <= 0"
+            @click="mediaIndex = Math.max(0, mediaIndex - 1)"
+          >
+            ‹
+          </button>
+          <span class="media-dots">{{ mediaIndex + 1 }} / {{ mediaList.length }}</span>
+          <button
+            type="button"
+            class="nav-btn"
+            :disabled="mediaIndex >= mediaList.length - 1"
+            @click="mediaIndex = Math.min(mediaList.length - 1, mediaIndex + 1)"
+          >
+            ›
+          </button>
+        </div>
         <button type="button" class="close-float" @click="$emit('close')">×</button>
       </div>
 
@@ -206,7 +240,6 @@ function goAuthor() {
                 />
                 <div>
                   <strong>{{ author?.nickname || author?.username || `用户${detail.userId}` }}</strong>
-                  <div class="muted">id={{ detail.userId }} · 笔记 #{{ detail.id }}</div>
                 </div>
               </button>
               <button type="button" class="follow-btn" @click="goAuthor">主页</button>
@@ -310,14 +343,64 @@ function goAuthor() {
   position: relative;
   background: #111;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  overflow: hidden;
 }
 
-.cover img {
+/* SignedImg 是子组件，scoped 必须用 :deep 才能作用到内部 img */
+.cover :deep(img) {
+  display: block;
   width: 100%;
   max-height: 42vh;
+  height: auto;
   object-fit: contain;
   margin: 0 auto;
   background: #111;
+}
+
+.media-nav {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  pointer-events: none;
+}
+
+.media-nav .nav-btn,
+.media-nav .media-dots {
+  pointer-events: auto;
+}
+
+.media-nav .nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.media-nav .nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.media-dots {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 0.75rem;
 }
 
 .cover-ph {
@@ -562,14 +645,17 @@ footer {
   .cover {
     flex: 1.15;
     height: 100%;
-    display: grid;
-    place-items: center;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .cover img {
+  .cover :deep(img) {
+    max-width: 100%;
     max-height: 100%;
-    width: 100%;
-    height: 100%;
+    width: auto;
+    height: auto;
     object-fit: contain;
   }
 

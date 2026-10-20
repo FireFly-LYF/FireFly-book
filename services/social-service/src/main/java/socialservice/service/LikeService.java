@@ -59,7 +59,7 @@ public class LikeService {
                 .expireAfterWrite(Duration.ofSeconds(30))
                 .executor(refreshExecutor)
                 .build(this::loadCount);
-        log.info("LikeService count L1={}", l1Enabled);
+        log.info("LikeService count L1={} (false=L1 off, Redis count L2 still on)", l1Enabled);
     }
 
     public void like(Long userId, Long noteId) {
@@ -81,7 +81,7 @@ public class LikeService {
         decrCount(noteId);
     }
 
-    /** L1 Caffeine + Redis 标量；未命中则 COUNT 库表并回写 */
+    /** L1 Caffeine + Redis 标量；关 L1 时仍走 Redis L2（非响应字节预序列化）。 */
     public long count(Long noteId) {
         if (noteId == null) {
             return 0L;
@@ -177,6 +177,9 @@ public class LikeService {
 
     private long rebuildCount(Long noteId) {
         long n = noteLikeMapper.countByNoteId(noteId);
+        if (!l1Enabled) {
+            return n;
+        }
         try {
             redis.opsForValue().set(countKey(noteId), String.valueOf(n), COUNT_TTL);
         } catch (Exception e) {

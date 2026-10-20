@@ -37,6 +37,12 @@ public class NoteController {
         }
     }
 
+    /** 发现流：全站最新已发布笔记（可不登录，经网关白名单） */
+    @GetMapping("/discover")
+    public ApiResponse<List<Note>> discover(@RequestParam(defaultValue = "40") int size) {
+        return ApiResponse.ok(noteService.listDiscover(size));
+    }
+
     /** 写在 /{id} 前面，避免被当成 id */
     @GetMapping("/user/{userId}")
     public ApiResponse<List<Note>> listByUser(

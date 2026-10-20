@@ -9,8 +9,22 @@ const mode = ref('login')
 const form = ref({ username: '', password: '123456', nickname: '' })
 const err = ref('')
 const loading = ref(false)
+/** 仅当按下与抬起都在遮罩上时才关闭，避免输入框拖选文字时误关 */
+const closeOnMaskUp = ref(false)
+
+function onMaskPointerDown(e) {
+  closeOnMaskUp.value = e.target === e.currentTarget
+}
+
+function onMaskClick(e) {
+  if (closeOnMaskUp.value && e.target === e.currentTarget) {
+    emit('close')
+  }
+  closeOnMaskUp.value = false
+}
 
 async function submit() {
+  if (loading.value || !form.value.username) return
   err.value = ''
   loading.value = true
   try {
@@ -41,28 +55,35 @@ async function submit() {
 </script>
 
 <template>
-  <div v-if="open" class="mask" @click.self="$emit('close')">
-    <div class="sheet">
+  <div
+    v-if="open"
+    class="mask"
+    @pointerdown="onMaskPointerDown"
+    @click="onMaskClick"
+  >
+    <div class="sheet" @pointerdown.stop>
       <header>
         <strong>{{ mode === 'login' ? '登录 FireFly' : '注册 FireFly' }}</strong>
         <button type="button" class="x" @click="$emit('close')">×</button>
       </header>
-      <div class="field">
-        <label>用户名</label>
-        <input v-model="form.username" placeholder="alice" autocomplete="username" />
-      </div>
-      <div class="field" v-if="mode === 'register'">
-        <label>昵称</label>
-        <input v-model="form.nickname" placeholder="可选" />
-      </div>
-      <div class="field">
-        <label>密码</label>
-        <input v-model="form.password" type="password" autocomplete="current-password" />
-      </div>
-      <p v-if="err" class="err">{{ err }}</p>
-      <button type="button" class="primary" :disabled="loading || !form.username" @click="submit">
-        {{ loading ? '提交中…' : mode === 'login' ? '登录' : '注册并登录' }}
-      </button>
+      <form @submit.prevent="submit">
+        <div class="field">
+          <label>用户名</label>
+          <input v-model="form.username" placeholder="alice" autocomplete="username" />
+        </div>
+        <div class="field" v-if="mode === 'register'">
+          <label>昵称</label>
+          <input v-model="form.nickname" placeholder="可选" />
+        </div>
+        <div class="field">
+          <label>密码</label>
+          <input v-model="form.password" type="password" autocomplete="current-password" />
+        </div>
+        <p v-if="err" class="err">{{ err }}</p>
+        <button type="submit" class="primary" :disabled="loading || !form.username">
+          {{ loading ? '提交中…' : mode === 'login' ? '登录' : '注册并登录' }}
+        </button>
+      </form>
       <button type="button" class="switch" @click="mode = mode === 'login' ? 'register' : 'login'">
         {{ mode === 'login' ? '没有账号？去注册' : '已有账号？去登录' }}
       </button>

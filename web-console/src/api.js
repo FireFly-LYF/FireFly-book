@@ -1,5 +1,6 @@
 const SESSION_KEY = 'ff-session'
 const DEVICE_KEY = 'ff-device-id'
+const mediaSignCache = new Map()
 
 export function loadAuthSession() {
   try {
@@ -9,9 +10,39 @@ export function loadAuthSession() {
   }
 }
 
+/** 登录/退出后递增，供 SignedImg 等重新拉签名 */
+let authEpoch = 0
+const authListeners = new Set()
+
+export function getAuthEpoch() {
+  return authEpoch
+}
+
+export function onAuthChange(cb) {
+  authListeners.add(cb)
+  return () => authListeners.delete(cb)
+}
+
+export function clearMediaSignCache() {
+  mediaSignCache.clear()
+}
+
+function bumpAuthEpoch() {
+  authEpoch += 1
+  clearMediaSignCache()
+  authListeners.forEach((cb) => {
+    try {
+      cb(authEpoch)
+    } catch {
+      /* ignore */
+    }
+  })
+}
+
 export function saveAuthSession(session) {
   if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session))
   else localStorage.removeItem(SESSION_KEY)
+  bumpAuthEpoch()
 }
 
 /**
@@ -327,6 +358,10 @@ export function feedApi() {
       request(`/api/feed/following?size=${size}`, {
         headers: authHeaders(),
       }),
+    discover: (size = 40) =>
+      request(`/api/feed/discover?size=${size}`, {
+        headers: authHeaders(),
+      }),
   }
 }
 
@@ -390,7 +425,7 @@ async function searchStreamRequest(url, body, handlers, signal, allowRefresh = t
     let msg = text
     try {
       const j = JSON.parse(text)
-      msg = j.message || j.detail || text
+      msg = j.message || j.msg || j.detail || text
     } catch {
       /* keep raw */
     }
@@ -459,10 +494,8 @@ export function isSignedMediaPath(url) {
   return p.startsWith('/files/')
 }
 
-const signCache = new Map()
-
 /**
- * 将规范 /files/... 换成带 exp+sig 的短期 URL（需登录）。
+ * 将规范 /files/... 换成带 exp+sig 的短期 URL。
  * 静态 /avatars 等原样返回。
  */
 export async function resolveSignedMediaUrl(url) {
@@ -471,7 +504,7 @@ export async function resolveSignedMediaUrl(url) {
   if (!path.startsWith('/files/')) return path
 
   const now = Math.floor(Date.now() / 1000)
-  const hit = signCache.get(path)
+  const hit = mediaSignCache.get(path)
   if (hit && hit.exp > now + 60) {
     return hit.accessUrl
   }
@@ -480,11 +513,19 @@ export async function resolveSignedMediaUrl(url) {
   if (res.body?.code !== 0) {
     throw new Error(res.body?.message || '媒体签名失败')
   }
-  const accessUrl = res.body.data?.urls?.[path] || res.body.data?.accessUrl || ''
+  let accessUrl = res.body.data?.urls?.[path] || res.body.data?.accessUrl || ''
   if (!accessUrl) throw new Error('空 accessUrl')
+  if (accessUrl.startsWith('http://') || accessUrl.startsWith('https://')) {
+    try {
+      const u = new URL(accessUrl)
+      accessUrl = u.pathname + u.search
+    } catch {
+      // keep as-is
+    }
+  }
 
   const expMatch = /[?&]exp=(\d+)/.exec(accessUrl)
   const exp = expMatch ? Number(expMatch[1]) : now + 3000
-  signCache.set(path, { accessUrl, exp })
+  mediaSignCache.set(path, { accessUrl, exp })
   return accessUrl
 }

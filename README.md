@@ -104,7 +104,7 @@ docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
 cd web-console; npm install; npm run dev
 ```
 
-造数：`.\deploy\scripts\seed-notes.ps1`（可选 `-NoCovers`）。种子账号如 `seed_momo` / `123456`。
+造数：`.\deploy\scripts\seed-notes.ps1`（可选 `-NoCovers`）；评论（含楼中楼）：`.\deploy\scripts\seed-comments.ps1`。种子账号如 `seed_momo` / `123456`。
 
 ### 4. AI（审核 / 搜索助手）
 

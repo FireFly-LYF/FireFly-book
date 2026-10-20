@@ -22,6 +22,7 @@ import java.util.function.Function;
  *   <li>L1 Caffeine：{@code refreshAfterWrite} 异步回源，仍返回旧值</li>
  *   <li>L2 Redis：{@code note:comments:{noteId}:{page}:{size}}</li>
  * </ul>
+ * {@code firefly.cache.l1-enabled=false} 时关 L1，且关 Redis「整包响应字节」预序列化，每次 deepLoader。
  */
 @Component
 public class CommentCache {
@@ -53,7 +54,7 @@ public class CommentCache {
                 .expireAfterWrite(EXPIRE_AFTER)
                 .executor(refreshExecutor)
                 .build(this::load);
-        log.info("CommentCache L1={}", l1Enabled);
+        log.info("CommentCache L1={} (false=L1 off + Redis response-bytes off)", l1Enabled);
     }
 
     /** 由 CommentService 绑定：Redis miss 时查库并序列化整包 JSON。 */
@@ -67,19 +68,17 @@ public class CommentCache {
         }
         String k = key(noteId, page, size);
         if (!l1Enabled) {
-            return load(k);
+            return loadDeep(k);
         }
         return local.get(k);
     }
 
     public void put(Long noteId, int page, int size, byte[] body) {
-        if (noteId == null || body == null) {
+        if (noteId == null || body == null || !l1Enabled) {
             return;
         }
         String k = key(noteId, page, size);
-        if (l1Enabled) {
-            local.put(k, body);
-        }
+        local.put(k, body);
         writeRedis(k, body);
     }
 
@@ -110,6 +109,13 @@ public class CommentCache {
         if (fromRedis != null) {
             return fromRedis;
         }
+        byte[] built = loadDeep(key);
+        writeRedis(key, built);
+        return built;
+    }
+
+    /** 无 L1/L2：查库并序列化整包 JSON。 */
+    private byte[] loadDeep(String key) {
         Function<String, byte[]> loader = deepLoader.get();
         if (loader == null) {
             throw new IllegalStateException("comment cache deep loader unset");
@@ -118,7 +124,6 @@ public class CommentCache {
         if (built == null) {
             throw new IllegalStateException("comment cache deep loader returned null");
         }
-        writeRedis(key, built);
         return built;
     }
 

@@ -75,6 +75,23 @@ public class ContentClient {
         }
     }
 
+    /** 发现流：全站最新已发布笔记 */
+    public List<FeedItem> listDiscover(int size) {
+        try {
+            int limit = size <= 0 ? 20 : Math.min(size, 50);
+            String url = contentBaseUrl + "/api/note/discover?size=" + limit;
+            ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+            return parseNoteList(resp.getBody());
+        } catch (Exception e) {
+            log.warn("调 content listDiscover 失败: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
     public List<FeedItem> listByUser(Long userId, int page, int size) {
         try {
             String url = contentBaseUrl + "/api/note/user/" + userId + "?page=" + page + "&size=" + size;

@@ -24,6 +24,10 @@ public interface NoteMapper {
                           @Param("limit") int limit,
                           @Param("offset") int offset);
 
+    /** 发现流：全站已发布笔记，按时间倒序 */
+    @Select("SELECT * FROM note WHERE status = 1 ORDER BY id DESC LIMIT #{limit} OFFSET #{offset}")
+    List<Note> listDiscover(@Param("limit") int limit, @Param("offset") int offset);
+
     /** 本人主页：已发布 + 审核中（不含拒绝） */
     @Select("SELECT * FROM note WHERE user_id=#{userId} AND status IN (1, 2) ORDER BY id DESC LIMIT #{limit} OFFSET #{offset}")
     List<Note> listByOwner(@Param("userId") Long userId,

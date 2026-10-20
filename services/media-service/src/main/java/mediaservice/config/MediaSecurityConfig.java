@@ -21,7 +21,7 @@ public class MediaSecurityConfig {
     public FilterRegistrationBean<SignedFileFilter> signedFileFilter(MediaUrlSigner signer) {
         FilterRegistrationBean<SignedFileFilter> bean = new FilterRegistrationBean<>();
         bean.setFilter(new SignedFileFilter(signer));
-        bean.addUrlPatterns("/files/*");
+        bean.addUrlPatterns("/files", "/files/*");
         bean.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return bean;
     }

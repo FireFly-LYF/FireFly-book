@@ -204,6 +204,17 @@ public class NoteService {
         }
     }
 
+    /** 发现流：全站最新已发布笔记（新账号默认可看） */
+    public List<Note> listDiscover(int size) {
+        int limit = size <= 0 ? 20 : Math.min(size, 50);
+        List<Note> notes = noteMapper.listDiscover(limit, 0);
+        if (notes == null || notes.isEmpty()) {
+            return List.of();
+        }
+        noteCache.putMany(notes);
+        return notes;
+    }
+
     public List<Note> listByUser(Long userId, int page, int size, Long viewerUserId) {
         if (page < 1) {
             page = 1;

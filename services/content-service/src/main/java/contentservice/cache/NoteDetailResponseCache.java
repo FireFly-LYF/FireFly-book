@@ -18,6 +18,7 @@ import java.util.function.Function;
 /**
  * 笔记详情整包响应缓存：{@code note:detail:resp:{id}}。
  * L1 Caffeine（refreshAfterWrite）+ L2 Redis，存 ApiResponse JSON 字节。
+ * {@code firefly.cache.l1-enabled=false} 时关 L1，且关 Redis 整包响应字节预序列化，每次 deepLoader。
  */
 @Component
 public class NoteDetailResponseCache {
@@ -49,7 +50,7 @@ public class NoteDetailResponseCache {
                 .expireAfterWrite(EXPIRE_AFTER)
                 .executor(refreshExecutor)
                 .build(this::load);
-        log.info("NoteDetailResponseCache L1={}", l1Enabled);
+        log.info("NoteDetailResponseCache L1={} (false=L1 off + Redis response-bytes off)", l1Enabled);
     }
 
     public void bindDeepLoader(Function<Long, byte[]> loader) {
@@ -61,7 +62,7 @@ public class NoteDetailResponseCache {
             return null;
         }
         if (!l1Enabled) {
-            return load(noteId);
+            return loadDeep(noteId);
         }
         return local.get(noteId);
     }
@@ -83,6 +84,12 @@ public class NoteDetailResponseCache {
         if (fromRedis != null) {
             return fromRedis;
         }
+        byte[] built = loadDeep(noteId);
+        writeRedis(noteId, built);
+        return built;
+    }
+
+    private byte[] loadDeep(Long noteId) {
         Function<Long, byte[]> loader = deepLoader.get();
         if (loader == null) {
             throw new IllegalStateException("note detail cache deep loader unset");
@@ -91,7 +98,6 @@ public class NoteDetailResponseCache {
         if (built == null) {
             throw new IllegalStateException("note detail cache deep loader returned null");
         }
-        writeRedis(noteId, built);
         return built;
     }
 
