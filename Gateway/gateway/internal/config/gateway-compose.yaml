@@ -55,6 +55,9 @@ ratelimit:
     - prefix: /api/ai
       rate: 3
       capacity: 6
+    - prefix: /api/market/orders
+      rate: 10
+      capacity: 20
     - prefix: /files
       rate: 40
       capacity: 80
@@ -112,6 +115,11 @@ routes:
     prefix: /api/search
     upstreams:
       - http: http://search-service:9007
+        weight: 1
+  - id: market
+    prefix: /api/market
+    upstreams:
+      - http: http://market-service:9008
         weight: 1
   - id: ai-assistant
     prefix: /api/ai

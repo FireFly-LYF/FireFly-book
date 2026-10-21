@@ -5,7 +5,7 @@
 ## 启动
 
 1. MySQL / Redis / RabbitMQ / ES  
-2. Java 服务（9001–9007）  
+2. Java 服务（9001–9008）  
 3. Gateway：`cd Gateway/gateway && go run ./cmd/gateway`  
 4. 前端：
 
@@ -31,12 +31,12 @@ Vite 将 `/api`、`/files` 代理到 Gateway `:8080`。
 | 通知 | 通知列表、已读 |
 | 关注流 | `GET /api/feed/following`（feed-service 写扩散时间线） |
 | 搜索 | 笔记/用户搜索 + AI 智能回答（引用溯源，需 assistant-service） |
+| 市集 | 商品浏览/上架、购物车、地址、下单、模拟支付、发货/确认收货/售后 |
 
 ## 占位中
 
 - 附近（LBS）
 - 全局推荐发现流
-- 市集 / 电商
 - 私信 IM
 - 个人页编辑资料、获赞总数
 - 发布页：话题 / 地点 / @用户

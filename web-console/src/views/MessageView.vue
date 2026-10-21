@@ -15,7 +15,14 @@ const names = ref({})
 const avatars = ref({})
 const loading = ref(false)
 
-const typeLabel = { LIKE: '赞了你', COMMENT: '评论了你', FOLLOW: '关注了你' }
+const typeLabel = {
+  LIKE: '赞了你',
+  COMMENT: '评论了你',
+  FOLLOW: '关注了你',
+  ORDER_PAID: '订单已付款',
+  ORDER_CANCELLED: '取消了订单',
+  ORDER_REFUNDED: '退款已完成',
+}
 
 watch(
   () => props.loggedIn,
@@ -159,6 +166,7 @@ header {
   font-size: 0.95rem;
   color: var(--ink-3);
   font-weight: 500;
+  transition: color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
 }
 .tabs button.on {
   color: var(--ink);
@@ -178,6 +186,8 @@ header {
   align-items: flex-start;
   padding: 0.85rem 1rem;
   border-bottom: 1px solid #f3f3f3;
+  animation: ff-card-in 0.3s var(--ease-out) both;
+  transition: background-color var(--dur-fast) ease;
 }
 
 .list li.unread { background: #fff8f9; }

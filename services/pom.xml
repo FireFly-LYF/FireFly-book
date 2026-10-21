@@ -17,5 +17,6 @@
 		<module>notify-service</module>
 		<module>feed-service</module>
 		<module>search-service</module>
+		<module>market-service</module>
 	</modules>
 </project>

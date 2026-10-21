@@ -14,7 +14,7 @@ $StateDir = Join-Path $RepoRoot ".firefly-dev"
 $PidFile = Join-Path $StateDir "pids.json"
 $ComposeFile = Join-Path $RepoRoot "deploy\docker-compose.yml"
 
-$DevPorts = @(9001, 9002, 9003, 9004, 9005, 9006, 9007, 8080, 5173)
+$DevPorts = @(9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008, 8080, 5173)
 
 function Stop-PidsParallel([int[]]$Pids, [string]$ReasonPrefix = "") {
     $unique = @($Pids | Where-Object { $_ -gt 4 } | Select-Object -Unique)

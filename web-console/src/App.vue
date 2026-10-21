@@ -134,53 +134,68 @@ function onProfileUpdated(user) {
 
     <div class="shell">
       <main class="main">
-        <SearchView
-          v-if="showSearch"
-          :logged-in="loggedIn"
-          @back="showSearch = false"
-          @open-note="openNote"
-          @open-profile="openProfile"
-          @need-login="needLogin"
-          @toast="showToast"
-        />
-        <HomeView
-          v-else-if="tab === 'home'"
-          :user-id="userId"
-          :logged-in="loggedIn"
-          @open-note="openNote"
-          @open-profile="openProfile"
-          @need-login="needLogin"
-          @search="showSearch = true"
-        />
-        <MarketView v-else-if="tab === 'market'" />
-        <PublishView
-          v-else-if="tab === 'publish'"
-          :logged-in="loggedIn"
-          @need-login="needLogin"
-          @toast="showToast"
-          @published="onPublished"
-        />
-        <MessageView
-          v-else-if="tab === 'msg'"
-          :logged-in="loggedIn"
-          :user-id="userId"
-          @need-login="needLogin"
-          @toast="showToast"
-          @unread="setUnread"
-          @open-profile="openProfile"
-        />
-        <ProfileView
-          v-else
-          :session="session"
-          :profile-user-id="viewingUserId"
-          @need-login="needLogin"
-          @logout="logout"
-          @open-note="openNote"
-          @open-profile="openProfile"
-          @back="backFromProfile"
-          @toast="showToast"
-          @profile-updated="onProfileUpdated"
-        />
+        <Transition name="page" mode="out-in">
+          <SearchView
+            v-if="showSearch"
+            key="search"
+            :logged-in="loggedIn"
+            @back="showSearch = false"
+            @open-note="openNote"
+            @open-profile="openProfile"
+            @need-login="needLogin"
+            @toast="showToast"
+          />
+          <HomeView
+            v-else-if="tab === 'home'"
+            key="home"
+            :user-id="userId"
+            :logged-in="loggedIn"
+            @open-note="openNote"
+            @open-profile="openProfile"
+            @need-login="needLogin"
+            @search="showSearch = true"
+          />
+          <MarketView
+            v-else-if="tab === 'market'"
+            key="market"
+            :logged-in="loggedIn"
+            :user-id="userId"
+            @need-login="needLogin"
+            @toast="showToast"
+            @open-profile="openProfile"
+          />
+          <PublishView
+            v-else-if="tab === 'publish'"
+            key="publish"
+            :logged-in="loggedIn"
+            @need-login="needLogin"
+            @toast="showToast"
+            @published="onPublished"
+          />
+          <MessageView
+            v-else-if="tab === 'msg'"
+            key="msg"
+            :logged-in="loggedIn"
+            :user-id="userId"
+            @need-login="needLogin"
+            @toast="showToast"
+            @unread="setUnread"
+            @open-profile="openProfile"
+          />
+          <ProfileView
+            v-else
+            key="me"
+            :session="session"
+            :profile-user-id="viewingUserId"
+            @need-login="needLogin"
+            @logout="logout"
+            @open-note="openNote"
+            @open-profile="openProfile"
+            @back="backFromProfile"
+            @toast="showToast"
+            @profile-updated="onProfileUpdated"
+          />
+        </Transition>
       </main>
     </div>
 
@@ -196,6 +211,7 @@ function onProfileUpdated(user) {
       :open="!!detailId"
       :note-id="detailId"
       :logged-in="loggedIn"
+      :current-user-id="userId"
       @close="detailId = null"
       @need-login="needLogin"
       @toast="showToast"
@@ -208,7 +224,9 @@ function onProfileUpdated(user) {
       @success="onLoginSuccess"
     />
 
-    <div v-if="toast" class="toast">{{ toast }}</div>
+    <Transition name="toast">
+      <div v-if="toast" class="toast">{{ toast }}</div>
+    </Transition>
   </div>
 </template>
 
@@ -248,6 +266,7 @@ function onProfileUpdated(user) {
   max-width: min(90vw, 420px);
   text-align: center;
   pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 .mobile-only { display: none; }

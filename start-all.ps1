@@ -41,7 +41,8 @@ $JavaServices = @(
     @{ Name = "social-service";  Port = 9004 },
     @{ Name = "notify-service";  Port = 9005 },
     @{ Name = "feed-service";    Port = 9006 },
-    @{ Name = "search-service";  Port = 9007 }
+    @{ Name = "search-service";  Port = 9007 },
+    @{ Name = "market-service";  Port = 9008 }
 )
 
 function Write-Step([string]$Message) {
@@ -262,7 +263,7 @@ if (-not $SkipJava) {
         }
     }
 
-    Write-Step "Start Java services in background (9001-9007)"
+    Write-Step "Start Java services in background (9001-9008)"
     foreach ($svc in $JavaServices) {
         if (Test-PortOpen $svc.Port) {
             Write-Host ("  skip {0} -- :{1} already listening" -f $svc.Name, $svc.Port) -ForegroundColor Yellow

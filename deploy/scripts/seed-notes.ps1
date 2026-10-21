@@ -90,33 +90,55 @@ function Ensure-User([string]$Username, [string]$Nickname) {
   return $login2.data
 }
 
+function Get-LocalCoverPool {
+  $dir = Join-Path $PSScriptRoot 'seed-covers'
+  if (-not (Test-Path -LiteralPath $dir)) { return @() }
+  return @(Get-ChildItem -LiteralPath $dir -Filter '*.jpg' -File | Sort-Object Name)
+}
+
 function New-CoverJpeg([string]$OutPath, [string]$SeedText) {
-  $ok = $false
+  # 1) 优先用本地封面库（外网 picsum 常不可达，避免再生成带 ffseed 字样的纯色图）
+  $pool = Get-LocalCoverPool
+  if ($pool.Count -gt 0) {
+    $hash = [Math]::Abs($SeedText.GetHashCode())
+    $src = $pool[$hash % $pool.Count].FullName
+    Copy-Item -LiteralPath $src -Destination $OutPath -Force
+    if ((Test-Path -LiteralPath $OutPath) -and ((Get-Item -LiteralPath $OutPath).Length -gt 8000)) {
+      return
+    }
+  }
+
+  # 2) 尝试 picsum（可选）
   try {
-    & curl.exe -sL --max-time 15 -o $OutPath ("https://picsum.photos/seed/{0}/720/900" -f $SeedText) | Out-Null
-    if ((Test-Path $OutPath) -and ((Get-Item $OutPath).Length -gt 2000)) {
-      $ok = $true
+    & curl.exe -sL --max-time 12 -o $OutPath ("https://picsum.photos/seed/{0}/720/900" -f $SeedText) | Out-Null
+    if ((Test-Path -LiteralPath $OutPath) -and ((Get-Item -LiteralPath $OutPath).Length -gt 8000)) {
+      return
     }
   } catch {}
 
-  if (-not $ok) {
-    Add-Type -AssemblyName System.Drawing
-    $bmp = New-Object System.Drawing.Bitmap 720, 900
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $hash = [Math]::Abs($SeedText.GetHashCode())
-    $c = [System.Drawing.Color]::FromArgb(
-      255,
-      80 + ($hash % 140),
-      90 + ([int]($hash / 7) % 120),
-      110 + ([int]($hash / 13) % 100)
-    )
-    $g.Clear($c)
-    $font = New-Object System.Drawing.Font 'Arial', 28
-    $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
-    $g.DrawString($SeedText, $font, $brush, 40, 400)
-    $bmp.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Jpeg)
-    $g.Dispose(); $bmp.Dispose(); $font.Dispose(); $brush.Dispose()
+  # 3) 最后回退：柔和渐变（不绘制 SeedText，避免页面出现 ffseed 占位字）
+  Add-Type -AssemblyName System.Drawing
+  $bmp = New-Object System.Drawing.Bitmap 720, 900
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $hash = [Math]::Abs($SeedText.GetHashCode())
+  $c1 = [System.Drawing.Color]::FromArgb(255, 60 + ($hash % 120), 80 + ([int]($hash / 5) % 100), 120 + ([int]($hash / 11) % 80)
+  $c2 = [System.Drawing.Color]::FromArgb(255, 140 + ($hash % 80), 100 + ([int]($hash / 3) % 90), 90 + ([int]($hash / 17) % 100)
+  $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush (
+    (New-Object System.Drawing.Point 0, 0),
+    (New-Object System.Drawing.Point 720, 900),
+    $c1, $c2
+  )
+  $g.FillRectangle($brush, 0, 0, 720, 900)
+  $rnd = [Random]::new($hash)
+  for ($i = 0; $i -lt 40; $i++) {
+    $alpha = 18 + $rnd.Next(40)
+    $spot = [System.Drawing.Color]::FromArgb($alpha, $rnd.Next(255), $rnd.Next(255), $rnd.Next(255))
+    $sb = New-Object System.Drawing.SolidBrush $spot
+    $g.FillEllipse($sb, $rnd.Next(-40, 680), $rnd.Next(-40, 860), 40 + $rnd.Next(180), 40 + $rnd.Next(180))
+    $sb.Dispose()
   }
+  $bmp.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+  $brush.Dispose(); $g.Dispose(); $bmp.Dispose()
 }
 
 function Upload-Cover([string]$Token, [string]$JpegPath) {

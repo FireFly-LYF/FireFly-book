@@ -223,6 +223,10 @@ function openNote(note) {
   color: var(--ink-3);
   font-weight: 500;
   padding: 0.35rem 0;
+  transition:
+    color var(--dur-fast) ease,
+    font-size var(--dur) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 
 .channels button.on {
@@ -231,7 +235,7 @@ function openNote(note) {
   font-size: 1.05rem;
 }
 
-.channels button.on::after {
+.channels button::after {
   content: '';
   position: absolute;
   left: 50%;
@@ -240,7 +244,13 @@ function openNote(note) {
   height: 3px;
   border-radius: 2px;
   background: var(--xhs-red);
-  transform: translateX(-50%);
+  transform: translateX(-50%) scaleX(0);
+  transform-origin: center;
+  transition: transform var(--dur) var(--ease-out);
+}
+
+.channels button.on::after {
+  transform: translateX(-50%) scaleX(1);
 }
 
 .mobile-search {

@@ -429,7 +429,7 @@ const displayName = computed(
             />
           </div>
           <p v-if="!collectedNotes.length" class="empty">
-            {{ isSelf ? '还没有收藏，去笔记详情点☆吧' : '对方还没有收藏' }}
+            {{ isSelf ? '还没有收藏，去笔记详情点收藏吧' : '对方还没有收藏' }}
           </p>
         </div>
 
@@ -447,7 +447,7 @@ const displayName = computed(
             />
           </div>
           <p v-if="!likedNotes.length" class="empty">
-            {{ isSelf ? '还没有赞过，去笔记详情点♡吧' : '对方还没有赞过' }}
+            {{ isSelf ? '还没有赞过，去笔记详情点个赞吧' : '对方还没有赞过' }}
           </p>
         </div>
       </template>
@@ -650,6 +650,10 @@ h1 {
   font-weight: 600;
   border: none;
   cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out);
 }
 
 .edit {

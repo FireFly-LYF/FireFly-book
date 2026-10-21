@@ -67,9 +67,18 @@ const items = [
   color: var(--ink-3);
   min-height: 48px;
   justify-content: center;
+  transition: color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
+}
+
+.item:active:not(.center) {
+  transform: scale(0.92);
 }
 
 .item.active { color: var(--ink); font-weight: 600; }
+
+.item.active .icon {
+  animation: ff-pop 0.35s var(--ease-spring);
+}
 
 .label {
   position: relative;
@@ -104,6 +113,10 @@ const items = [
 
 .center { transform: translateY(-8px); }
 
+.center:active {
+  transform: translateY(-8px) scale(0.94);
+}
+
 .plus {
   width: 44px;
   height: 36px;
@@ -116,5 +129,10 @@ const items = [
   display: grid;
   place-items: center;
   box-shadow: 0 6px 14px rgba(255, 36, 66, 0.28);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) ease;
+}
+
+.item.center:active .plus {
+  box-shadow: 0 3px 8px rgba(255, 36, 66, 0.22);
 }
 </style>

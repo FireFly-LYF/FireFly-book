@@ -85,6 +85,11 @@ const links = [
   font-size: 1.55rem;
   color: var(--xhs-red);
   flex-shrink: 0;
+  transition: transform var(--dur-fast) var(--ease-spring), opacity var(--dur-fast) ease;
+}
+
+.brand:active {
+  transform: scale(0.94);
 }
 
 .links {
@@ -103,6 +108,10 @@ const links = [
   color: var(--ink-2);
   font-weight: 500;
   font-size: 0.92rem;
+  transition:
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out);
 }
 
 .link:hover { background: #f7f7f7; color: var(--ink); }
@@ -139,6 +148,7 @@ const links = [
   background: #f5f5f5;
   color: var(--ink-3);
   font-size: 0.86rem;
+  transition: background-color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
 }
 
 .search:hover { background: #efefef; }
@@ -157,6 +167,7 @@ const links = [
   color: #fff;
   font-weight: 600;
   font-size: 0.86rem;
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) ease;
 }
 
 .login {
@@ -166,6 +177,11 @@ const links = [
   color: var(--xhs-red);
   font-weight: 600;
   font-size: 0.86rem;
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) ease;
+}
+
+.login:hover {
+  background: var(--brand-soft);
 }
 
 .user {

@@ -100,6 +100,7 @@ async function submit() {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  animation: ff-fade-in var(--dur) ease;
 }
 
 .sheet {
@@ -107,12 +108,7 @@ async function submit() {
   background: #fff;
   border-radius: 16px 16px 0 0;
   padding: 1rem 1.1rem calc(1.2rem + var(--safe-bottom));
-  animation: up 0.22s ease;
-}
-
-@keyframes up {
-  from { transform: translateY(24px); opacity: 0.6; }
-  to { transform: none; opacity: 1; }
+  animation: ff-rise var(--dur-slow) var(--ease-out);
 }
 
 @media (min-width: 769px) {
@@ -158,9 +154,13 @@ label {
   background: var(--xhs-red);
   color: #fff;
   font-weight: 600;
+  transition:
+    opacity var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) ease;
 }
 
-.primary:disabled { opacity: 0.5; }
+.primary:disabled { opacity: 0.5; transform: none; }
 
 .switch {
   width: 100%;

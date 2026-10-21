@@ -378,6 +378,152 @@ export function searchApi() {
   }
 }
 
+export function marketApi() {
+  return {
+    products: (page = 1, size = 20) =>
+      request(`/api/market/products?page=${page}&size=${size}`, {
+        headers: authHeaders(),
+      }),
+    product: (id) =>
+      request(`/api/market/products/${id}`, {
+        headers: authHeaders(),
+      }),
+    createProduct: (data, idempotencyKey) =>
+      request('/api/market/products', {
+        method: 'POST',
+        headers: authHeaders({
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey || newIdempotencyKey(),
+        }),
+        body: JSON.stringify(data),
+      }),
+    updateProduct: (id, data) =>
+      request(`/api/market/products/${id}`, {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      }),
+    productOff: (id) =>
+      request(`/api/market/products/${id}/off`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+    productOn: (id) =>
+      request(`/api/market/products/${id}/on`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+    sellerProducts: (page = 1, size = 20) =>
+      request(`/api/market/seller/products?page=${page}&size=${size}`, {
+        headers: authHeaders(),
+      }),
+    addresses: () =>
+      request('/api/market/addresses', {
+        headers: authHeaders(),
+      }),
+    createAddress: (data) =>
+      request('/api/market/addresses', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      }),
+    updateAddress: (id, data) =>
+      request(`/api/market/addresses/${id}`, {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      }),
+    deleteAddress: (id) =>
+      request(`/api/market/addresses/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }),
+    setDefaultAddress: (id) =>
+      request(`/api/market/addresses/${id}/default`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+    cart: () =>
+      request('/api/market/cart', {
+        headers: authHeaders(),
+      }),
+    cartAdd: (data) =>
+      request('/api/market/cart', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      }),
+    cartUpdate: (productId, quantity) =>
+      request(`/api/market/cart/${productId}`, {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ quantity }),
+      }),
+    cartRemove: (productId) =>
+      request(`/api/market/cart/${productId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }),
+    createOrder: (data, idempotencyKey) =>
+      request('/api/market/orders', {
+        method: 'POST',
+        headers: authHeaders({
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey || newIdempotencyKey(),
+        }),
+        body: JSON.stringify(data),
+      }),
+    orders: (page = 1, size = 20) =>
+      request(`/api/market/orders?page=${page}&size=${size}`, {
+        headers: authHeaders(),
+      }),
+    order: (id) =>
+      request(`/api/market/orders/${id}`, {
+        headers: authHeaders(),
+      }),
+    pay: (id) =>
+      request(`/api/market/orders/${id}/pay`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+    cancelOrder: (id) =>
+      request(`/api/market/orders/${id}/cancel`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+    confirmOrder: (id) =>
+      request(`/api/market/orders/${id}/confirm`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+    afterSale: (id, reason) =>
+      request(`/api/market/orders/${id}/after-sale`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ reason: reason || '' }),
+      }),
+    ship: (id) =>
+      request(`/api/market/orders/${id}/ship`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+    sellerOrders: (page = 1, size = 20) =>
+      request(`/api/market/seller/orders?page=${page}&size=${size}`, {
+        headers: authHeaders(),
+      }),
+    agreeAfterSale: (id) =>
+      request(`/api/market/after-sales/${id}/agree`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+    rejectAfterSale: (id) =>
+      request(`/api/market/after-sales/${id}/reject`, {
+        method: 'POST',
+        headers: authHeaders(),
+      }),
+  }
+}
+
 /** 解析 SSE 文本块 */
 function parseSseBlock(block, handlers) {
   if (!block.trim()) return

@@ -1,0 +1,15 @@
+server:
+  address: ${SERVER_ADDRESS:0.0.0.0}
+
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:${MYSQL_PORT:3306}/market?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+
+firefly:
+  user:
+    base-url: ${USER_BASE_URL:http://user-service:9001}

@@ -1,0 +1,53 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:9008}
+
+spring:
+  application:
+    name: market-service
+  config:
+    import: optional:classpath:firefly-observability.yml
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/market?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: market-hikari
+      maximum-pool-size: ${HIKARI_MAX_POOL:10}
+      minimum-idle: ${HIKARI_MIN_IDLE:3}
+      connection-timeout: ${HIKARI_CONNECTION_TIMEOUT:3000}
+      idle-timeout: ${HIKARI_IDLE_TIMEOUT:600000}
+      max-lifetime: ${HIKARI_MAX_LIFETIME:1800000}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD}
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  type-aliases-package: marketservice.entity
+
+firefly:
+  internal-auth:
+    enabled: true
+    hmac-secret: ${INTERNAL_HMAC_SECRET}
+    skew-sec: 60
+  http:
+    connect-timeout-ms: ${HTTP_CONNECT_TIMEOUT_MS:2000}
+    connection-request-timeout-ms: ${HTTP_CONNECTION_REQUEST_TIMEOUT_MS:1000}
+    read-timeout-ms: ${HTTP_READ_TIMEOUT_MS:3000}
+    max-total: ${HTTP_MAX_TOTAL:100}
+    max-per-route: ${HTTP_MAX_PER_ROUTE:20}
+  user:
+    base-url: ${USER_BASE_URL:http://127.0.0.1:9001}
+  outbox:
+    poll-interval-ms: 2000
+    batch-size: 50
+    max-attempts: 20

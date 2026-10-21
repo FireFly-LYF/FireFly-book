@@ -29,6 +29,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public DirectExchange marketExchange() {
+        return new DirectExchange(MqConstants.EXCHANGE_MARKET, true, false);
+    }
+
+    @Bean
     public DirectExchange dlxExchange() {
         return new DirectExchange(MqConstants.EXCHANGE_DLX, true, false);
     }
@@ -64,5 +69,20 @@ public class RabbitConfig {
     @Bean
     public Binding followBinding(Queue notifyQueue, DirectExchange socialExchange) {
         return BindingBuilder.bind(notifyQueue).to(socialExchange).with(MqConstants.RK_FOLLOW_CREATED);
+    }
+
+    @Bean
+    public Binding orderPaidBinding(Queue notifyQueue, DirectExchange marketExchange) {
+        return BindingBuilder.bind(notifyQueue).to(marketExchange).with(MqConstants.RK_ORDER_PAID);
+    }
+
+    @Bean
+    public Binding orderCancelledBinding(Queue notifyQueue, DirectExchange marketExchange) {
+        return BindingBuilder.bind(notifyQueue).to(marketExchange).with(MqConstants.RK_ORDER_CANCELLED);
+    }
+
+    @Bean
+    public Binding orderRefundedBinding(Queue notifyQueue, DirectExchange marketExchange) {
+        return BindingBuilder.bind(notifyQueue).to(marketExchange).with(MqConstants.RK_ORDER_REFUNDED);
     }
 }

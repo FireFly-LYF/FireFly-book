@@ -8,6 +8,7 @@ const props = defineProps({
   noteId: { type: [Number, String], default: null },
   open: Boolean,
   loggedIn: Boolean,
+  currentUserId: { type: [Number, String, null], default: null },
 })
 const emit = defineEmits(['close', 'need-login', 'toast', 'open-profile'])
 
@@ -16,12 +17,33 @@ const author = ref(null)
 const likeCount = ref(0)
 const liked = ref(false)
 const collected = ref(false)
+const followedByMe = ref(false)
 const comments = ref([])
 const commentText = ref('')
 const commentIdemKey = ref(null)
 const loading = ref(false)
+const likePop = ref(false)
+const collectPop = ref(false)
 /** 正在回复的评论：{ id, nickname }；null=发一级评论 */
 const replyTo = ref(null)
+
+function bumpPop(flag) {
+  flag.value = false
+  requestAnimationFrame(() => {
+    flag.value = true
+    setTimeout(() => {
+      flag.value = false
+    }, 380)
+  })
+}
+
+const isOwnNote = computed(() => {
+  const uid = detail.value?.userId ?? author.value?.id
+  if (uid == null || props.currentUserId == null) return false
+  return Number(uid) === Number(props.currentUserId)
+})
+
+const showFollow = computed(() => !isOwnNote.value)
 
 const mediaList = computed(() => {
   const d = detail.value
@@ -64,9 +86,7 @@ const commentThreads = computed(() => {
   }))
 })
 
-const commentPlaceholder = computed(() =>
-  replyTo.value ? `回复 ${replyTo.value.nickname}…` : '说点什么…',
-)
+const commentPlaceholder = '说点什么…'
 
 watch(
   () => [props.open, props.noteId, props.loggedIn],
@@ -95,10 +115,39 @@ async function load(id) {
     if (uid) {
       const u = await userApi().getById(uid)
       if (u.body?.code === 0) author.value = u.body.data
+      await refreshFollow(uid)
+    } else {
+      followedByMe.value = false
     }
     await refreshSocial(id)
   } finally {
     loading.value = false
+  }
+}
+
+async function refreshFollow(authorId) {
+  followedByMe.value = false
+  if (!props.loggedIn || !props.currentUserId) return
+  if (Number(authorId) === Number(props.currentUserId)) return
+  const mine = await userApi().following(props.currentUserId)
+  if (mine.body?.code === 0) {
+    const list = mine.body.data || []
+    followedByMe.value = list.some((u) => Number(u.id) === Number(authorId))
+  }
+}
+
+async function toggleFollow() {
+  if (!props.loggedIn) return emit('need-login')
+  const id = detail.value?.userId || author.value?.id
+  if (!id || isOwnNote.value) return
+  const res = followedByMe.value
+    ? await userApi().unfollow(id)
+    : await userApi().follow(id)
+  if (res.body?.code === 0) {
+    followedByMe.value = !followedByMe.value
+    emit('toast', followedByMe.value ? '已关注' : '已取消关注')
+  } else {
+    emit('toast', res.body?.message || '操作失败')
   }
 }
 
@@ -148,6 +197,7 @@ async function toggleLike() {
     : await api.like(props.noteId)
   if (res.body?.code === 0) {
     liked.value = !liked.value
+    if (liked.value) bumpPop(likePop)
     const c = await api.likeCount(props.noteId)
     if (c.body?.code === 0) {
       const d = c.body.data
@@ -162,8 +212,10 @@ async function toggleCollect() {
   const res = collected.value
     ? await api.uncollect(props.noteId)
     : await api.collect(props.noteId)
-  if (res.body?.code === 0) collected.value = !collected.value
-  else emit('toast', res.body?.message || '操作失败')
+  if (res.body?.code === 0) {
+    collected.value = !collected.value
+    if (collected.value) bumpPop(collectPop)
+  } else emit('toast', res.body?.message || '操作失败')
 }
 
 async function sendComment() {
@@ -242,7 +294,18 @@ function goAuthor() {
                   <strong>{{ author?.nickname || author?.username || `用户${detail.userId}` }}</strong>
                 </div>
               </button>
-              <button type="button" class="follow-btn" @click="goAuthor">主页</button>
+              <div class="author-actions">
+                <button
+                  v-if="showFollow"
+                  type="button"
+                  class="follow-btn"
+                  :class="{ ghost: followedByMe }"
+                  @click="toggleFollow"
+                >
+                  {{ followedByMe ? '已关注' : '关注' }}
+                </button>
+                <button type="button" class="home-btn" @click="goAuthor">主页</button>
+              </div>
             </div>
           </div>
 
@@ -299,11 +362,52 @@ function goAuthor() {
               :placeholder="commentPlaceholder"
               @keyup.enter="sendComment"
             />
-            <button type="button" class="act" :class="{ on: liked }" @click="toggleLike">
-              {{ liked ? '♥' : '♡' }} {{ likeCount }}
+            <button
+              type="button"
+              class="act"
+              :class="{ on: liked, pop: likePop }"
+              aria-label="点赞"
+              @click="toggleLike"
+            >
+              <svg class="ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  v-if="liked"
+                  fill="currentColor"
+                  d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                />
+                <path
+                  v-else
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linejoin="round"
+                  d="M12 20.5s-7.2-4.6-8.7-8.9C2.2 8.7 3.7 5.8 6.6 5.3c1.7-.3 3.4.5 4.4 1.8 1-1.3 2.7-2.1 4.4-1.8 2.9.5 4.4 3.4 3.3 6.3C19.2 15.9 12 20.5 12 20.5z"
+                />
+              </svg>
+              <span>{{ likeCount }}</span>
             </button>
-            <button type="button" class="act" :class="{ on: collected }" @click="toggleCollect">
-              {{ collected ? '★' : '☆' }}
+            <button
+              type="button"
+              class="act"
+              :class="{ on: collected, pop: collectPop }"
+              aria-label="收藏"
+              @click="toggleCollect"
+            >
+              <svg class="ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  v-if="collected"
+                  fill="currentColor"
+                  d="M6 2.8A1.8 1.8 0 0 1 7.8 1h8.4A1.8 1.8 0 0 1 18 2.8V22l-6-3.6L6 22V2.8z"
+                />
+                <path
+                  v-else
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linejoin="round"
+                  d="M7 3.2h10a1 1 0 0 1 1 1V20.5l-6-3.5-6 3.5V4.2a1 1 0 0 1 1-1z"
+                />
+              </svg>
             </button>
             <button type="button" class="send" @click="sendComment">发送</button>
           </div>
@@ -322,6 +426,7 @@ function goAuthor() {
   display: flex;
   align-items: stretch;
   justify-content: center;
+  animation: ff-fade-in var(--dur) ease;
 }
 
 .panel {
@@ -330,13 +435,8 @@ function goAuthor() {
   background: #fff;
   display: flex;
   flex-direction: column;
-  animation: rise 0.2s ease;
+  animation: ff-rise var(--dur-slow) var(--ease-out);
   overflow: hidden;
-}
-
-@keyframes rise {
-  from { transform: translateY(12px); opacity: 0.7; }
-  to { transform: none; opacity: 1; }
 }
 
 .cover {
@@ -485,16 +585,38 @@ h2 {
   flex-shrink: 0;
 }
 
-.follow-btn {
+.author-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.follow-btn,
+.home-btn {
   padding: 0.35rem 0.7rem;
   border-radius: 14px;
-  border: none;
-  background: var(--xhs-red);
-  color: #fff;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.follow-btn {
+  border: none;
+  background: var(--xhs-red);
+  color: #fff;
+}
+
+.follow-btn.ghost {
+  background: #f5f5f5;
+  color: var(--ink-2);
+}
+
+.home-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-2);
 }
 
 .comments {
@@ -606,18 +728,39 @@ footer {
 
 .footer-row input {
   flex: 1;
-  border-radius: 18px;
+  border-radius: 16px;
   background: #f5f5f5;
   border: none;
-  padding: 0.55rem 0.85rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.footer-row input::placeholder {
+  font-size: 0.8rem;
+  color: var(--ink-3);
 }
 
 .act {
-  min-width: 44px;
+  min-width: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
   color: var(--ink-2);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
+}
+.act .ico {
+  flex-shrink: 0;
+  display: block;
 }
 .act.on { color: var(--xhs-red); }
+.act.pop {
+  animation: ff-pop 0.38s var(--ease-spring);
+}
 
 .send {
   padding: 0.45rem 0.75rem;
@@ -626,6 +769,17 @@ footer {
   color: #fff;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+.follow-btn,
+.home-btn,
+.send {
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) ease;
 }
 
 @media (min-width: 900px) {

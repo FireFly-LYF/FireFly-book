@@ -120,8 +120,9 @@ header {
   color: #fff;
   font-weight: 600;
   font-size: 0.88rem;
+  transition: opacity var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
 }
-.go:disabled { opacity: 0.5; }
+.go:disabled { opacity: 0.5; transform: none; }
 
 .cover {
   display: block;
@@ -131,6 +132,11 @@ header {
   background: #f5f5f5;
   cursor: pointer;
   min-height: 180px;
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) ease;
+}
+
+.cover:active {
+  transform: scale(0.985);
 }
 
 .cover img {

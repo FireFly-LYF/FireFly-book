@@ -11,13 +11,13 @@
 |------|------|------|
 | 前端 | `web-console` | Vue 3 + Vite |
 | 网关 | `Gateway` | Go：JWT、CORS、分级限流、超时熔断、签名转发 |
-| 业务 | `services/` | 7 个 Spring Boot 服务 |
+| 业务 | `services/` | 8 个 Spring Boot 服务 |
 | AI | `services-ai/` | 内容审核（文本 + NSFW）、AI 搜索助手 |
 | 基础设施 | Docker | MySQL、Redis、RabbitMQ、ES（IK） |
 | 压测归档 | `bench/` | 网关/业务/L1/NSFW 脚本与报告（与业务隔离） |
 
 ```text
-浏览器 :5173 → Gateway :8080 → Java :9001–9007
+浏览器 :5173 → Gateway :8080 → Java :9001–9008
                               → assistant :9102（可选）
 note.created → moderation :9101 → 回写 status → note.published → feed / search
 ```
@@ -31,6 +31,7 @@ note.created → moderation :9101 → 回写 status → note.published → feed 
 | notify-service | 9005 | 通知 |
 | feed-service | 9006 | 关注流写扩散 |
 | search-service | 9007 | ES 搜索 |
+| market-service | 9008 | 市集：商品/购物车/地址/订单/模拟支付/售后 |
 | moderation-service | 9101 | 先审后发（文本 + NSFW HTTP） |
 | assistant-service | 9102 | AI 搜索（引用 + Web 过滤） |
 | Gateway | 8080 | 统一入口 |
@@ -49,11 +50,12 @@ note.created → moderation :9101 → 回写 status → note.published → feed 
 | 通知 | 列表/已读、写侧幂等 |
 | 信息流 | `GET /api/feed/following` |
 | 搜索 | ES + IK；可选 AI 问答与引用 |
+| 市集 | 商品上架/浏览、购物车、地址、下单扣库存、模拟支付、取消/售后（web-console 已接线） |
 | 网关 | JWT、白名单 CORS、限流、熔断、媒体签名 |
 | 缓存 | Redis L2 + Caffeine L1（详情/点赞计数/通知等，可开关） |
 | 可观测 | Actuator、RequestId |
 
-**未做：** 全局推荐发现流、LBS、市集、私信、完整个人页编辑等。
+**未做：** 全局推荐发现流、LBS、私信、完整个人页编辑、直播与真实支付等。
 
 压测结论与脚本见 [`bench/README.md`](./bench/README.md)。
 
@@ -101,10 +103,12 @@ notepad .env
 
 ```powershell
 docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+# 覆盖重建（停本机进程 + force-recreate，保留卷）：
+# .\deploy\scripts\redeploy.ps1
 cd web-console; npm install; npm run dev
 ```
 
-造数：`.\deploy\scripts\seed-notes.ps1`（可选 `-NoCovers`）；评论（含楼中楼）：`.\deploy\scripts\seed-comments.ps1`。种子账号如 `seed_momo` / `123456`。
+造数：`.\deploy\scripts\seed-notes.ps1`（可选 `-NoCovers`）；评论（含楼中楼）：`.\deploy\scripts\seed-comments.ps1`；市集：`.\deploy\scripts\seed-market.ps1`。种子账号如 `seed_momo` / `123456`。
 
 ### 4. AI（审核 / 搜索助手）
 

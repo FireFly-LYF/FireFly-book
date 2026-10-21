@@ -64,7 +64,18 @@ function onAuthorClick(e) {
           />
           <span class="name">{{ authorName || `用户${note.userId}` }}</span>
         </button>
-        <span class="likes">♡ {{ likeCount || '赞' }}</span>
+        <span class="likes">
+          <svg class="heart" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linejoin="round"
+              d="M12 20.5s-7.2-4.6-8.7-8.9C2.2 8.7 3.7 5.8 6.6 5.3c1.7-.3 3.4.5 4.4 1.8 1-1.3 2.7-2.1 4.4-1.8 2.9.5 4.4 3.4 3.3 6.3C19.2 15.9 12 20.5 12 20.5z"
+            />
+          </svg>
+          {{ likeCount || '赞' }}
+        </span>
       </div>
     </div>
   </article>
@@ -78,10 +89,23 @@ function onAuthorClick(e) {
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.15s ease;
+  transition:
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) ease;
+  animation: ff-card-in 0.35s var(--ease-out) both;
 }
 
-.card:active { transform: scale(0.985); }
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  }
+}
+
+.card:active {
+  transform: scale(0.98);
+  box-shadow: none;
+}
 
 .cover {
   position: relative;
@@ -186,5 +210,15 @@ h3 {
   white-space: nowrap;
 }
 
-.likes { flex-shrink: 0; }
+.likes {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.likes .heart {
+  display: block;
+  opacity: 0.85;
+}
 </style>
