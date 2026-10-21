@@ -120,24 +120,16 @@ coverage.html
 *.prof
 *.pprof
 
-# ----- 压测目录 bench/（原始输出含 JWT；构建产物）-----
-bench/java-gateway/target/
-bench/**/target/
-bench/reports/*.raw/
-bench/reports/*.raw
-bench/reports/*.raw.txt
-bench/reports/*.raw.log
-bench/reports/*.raw.csv
-bench/reports/*.console.txt
-bench/reports/*.console.log
+# ----- 压测目录（整目录忽略；含脚本/报告/JWT 原始输出）-----
+bench/
 
 # ----- 本地缓存（HF 模型权重、工具下载等，勿入库）-----
 .cache/
 **/.cache/
-bench/.cache/
 
 # ----- 压缩包与杂物 -----
 *.zip
 *.tar.gz
 *.rar
 .cursor/
+
