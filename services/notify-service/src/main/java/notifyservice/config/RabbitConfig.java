@@ -34,6 +34,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public DirectExchange imExchange() {
+        return new DirectExchange(MqConstants.EXCHANGE_IM, true, false);
+    }
+
+    @Bean
     public DirectExchange dlxExchange() {
         return new DirectExchange(MqConstants.EXCHANGE_DLX, true, false);
     }
@@ -84,5 +89,10 @@ public class RabbitConfig {
     @Bean
     public Binding orderRefundedBinding(Queue notifyQueue, DirectExchange marketExchange) {
         return BindingBuilder.bind(notifyQueue).to(marketExchange).with(MqConstants.RK_ORDER_REFUNDED);
+    }
+
+    @Bean
+    public Binding imMessageBinding(Queue notifyQueue, DirectExchange imExchange) {
+        return BindingBuilder.bind(notifyQueue).to(imExchange).with(MqConstants.RK_IM_MESSAGE_CREATED);
     }
 }

@@ -271,6 +271,16 @@ export function noteApi() {
       request(`/api/note/user/${userId}?page=${page}&size=${size}`, {
         headers: authHeaders(),
       }),
+    update: (id, data) =>
+      request(`/api/note/${id}`, {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      }),
+    statsByUser: (userId) =>
+      request(`/api/note/user/${userId}/stats`, {
+        headers: authHeaders(),
+      }),
     remove: (id) =>
       request(`/api/note/${id}`, {
         method: 'DELETE',
@@ -352,6 +362,48 @@ export function notifyApi() {
   }
 }
 
+export function imApi() {
+  return {
+    open: (peerUserId) =>
+      request('/api/im/conversations/open', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ peerUserId }),
+      }),
+    conversations: (limit = 50) =>
+      request(`/api/im/conversations?limit=${limit}`, {
+        headers: authHeaders(),
+      }),
+    messages: (conversationId, afterId = 0, limit = 50) => {
+      const q = afterId
+        ? `?afterId=${afterId}&limit=${limit}`
+        : `?limit=${limit}`
+      return request(`/api/im/conversations/${conversationId}/messages${q}`, {
+        headers: authHeaders(),
+      })
+    },
+    send: (conversationId, content, idempotencyKey) =>
+      request(`/api/im/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        headers: authHeaders({
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey || newIdempotencyKey(),
+        }),
+        body: JSON.stringify({ content }),
+      }),
+    read: (conversationId, messageId) =>
+      request(`/api/im/conversations/${conversationId}/read`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(messageId ? { messageId } : {}),
+      }),
+    unreadCount: () =>
+      request('/api/im/unread-count', {
+        headers: authHeaders(),
+      }),
+  }
+}
+
 export function feedApi() {
   return {
     following: (size = 20) =>
@@ -362,6 +414,13 @@ export function feedApi() {
       request(`/api/feed/discover?size=${size}`, {
         headers: authHeaders(),
       }),
+    nearby: (lat, lng, radiusKm = 8, size = 40) =>
+      request(
+        `/api/feed/nearby?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&radiusKm=${radiusKm}&size=${size}`,
+        {
+          headers: authHeaders(),
+        },
+      ),
   }
 }
 
@@ -612,10 +671,15 @@ export function assistantApi() {
           ...(noteCandidates?.length ? { noteCandidates } : {}),
         }),
       }),
-    searchStream: (query, includeWeb = false, handlers = {}, signal = null) =>
+    searchStream: (query, includeWeb = false, handlers = {}, signal = null, noteCandidates = null) =>
       searchStreamRequest(
         '/api/ai/search/stream',
-        { query, includeWeb },
+        {
+          query,
+          includeWeb,
+          noteLimit: 5,
+          ...(noteCandidates?.length ? { noteCandidates } : {}),
+        },
         handlers,
         signal,
       ),

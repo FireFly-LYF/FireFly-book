@@ -9,45 +9,24 @@ const props = defineProps({
 })
 const emit = defineEmits(['open-note', 'need-login', 'search', 'open-profile'])
 
+/** 南京新街口：定位失败 / 拒绝时的演示默认点 */
+const NANJING_XINJIEKOU = { lat: 32.041544, lng: 118.784485, label: '南京·新街口' }
+
 const channel = ref('discover')
 const loading = ref(false)
 const notes = ref([])
 const likes = ref({})
 const names = ref({})
 const avatars = ref({})
-
-const DEMO_NOTES = [
-  {
-    id: 'demo-1',
-    demo: true,
-    userId: 0,
-    title: '发现流接入 feed-service',
-    content: '全局推荐/发现流后端尚未实现；登录后可看关注流',
-    coverUrl: '',
-  },
-  {
-    id: 'demo-2',
-    demo: true,
-    userId: 0,
-    title: '搜索笔记与用户',
-    content: '点顶栏搜索，试「穿搭」「美食」「咖啡」',
-    coverUrl: '',
-  },
-  {
-    id: 'demo-3',
-    demo: true,
-    userId: 0,
-    title: '附近的人',
-    content: 'LBS 附近笔记待实现',
-    coverUrl: '',
-  },
-]
+const nearbyMeta = ref({ label: '', usingFallback: false })
 
 watch(channel, () => loadFeed())
 onMounted(() => loadFeed())
 watch(
   () => [props.userId, props.loggedIn],
-  () => loadFeed(),
+  () => {
+    if (channel.value !== 'nearby') loadFeed()
+  },
 )
 
 function mapFeedItems(items) {
@@ -56,8 +35,65 @@ function mapFeedItems(items) {
     userId: it.userId,
     title: it.title,
     coverUrl: it.coverUrl,
+    mediaCount: it.mediaCount,
+    mediaKind: it.mediaKind,
+    likeCount: it.likeCount,
     createdAt: it.createdAt,
+    distanceKm: it.distanceKm,
+    placeName: it.placeName,
   }))
+}
+
+async function enrichNotes(list) {
+  if (!list?.length) return
+  try {
+    await ensureNames(list.map((n) => n.userId))
+  } catch {
+    /* ignore */
+  }
+  try {
+    await loadLikes(list)
+  } catch {
+    /* ignore */
+  }
+}
+
+function resolvePosition() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve({ ...NANJING_XINJIEKOU, usingFallback: true })
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          label: '当前位置',
+          usingFallback: false,
+        })
+      },
+      () => {
+        resolve({ ...NANJING_XINJIEKOU, usingFallback: true })
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+    )
+  })
+}
+
+async function loadNearby() {
+  const pos = await resolvePosition()
+  nearbyMeta.value = {
+    label: pos.label || NANJING_XINJIEKOU.label,
+    usingFallback: !!pos.usingFallback,
+  }
+  const res = await feedApi().nearby(pos.lat, pos.lng, 8, 40)
+  if (res.body?.code !== 0) {
+    notes.value = []
+    return
+  }
+  notes.value = mapFeedItems(res.body.data || [])
+  void enrichNotes(notes.value)
 }
 
 async function loadDiscover() {
@@ -66,49 +102,38 @@ async function loadDiscover() {
     notes.value = []
     return
   }
-  const items = res.body.data || []
-  notes.value = mapFeedItems(items)
-  if (notes.value.length) {
-    await ensureNames(notes.value.map((n) => n.userId))
-    await loadLikes(notes.value)
-  }
-  if (!items.length && !props.loggedIn) {
-    notes.value = DEMO_NOTES
-  }
+  notes.value = mapFeedItems(res.body.data || [])
+  void enrichNotes(notes.value)
 }
 
 async function loadFeed() {
-  if (channel.value === 'nearby') {
-    notes.value = []
-    return
-  }
-
   loading.value = true
+  notes.value = []
   try {
+    if (channel.value === 'nearby') {
+      await loadNearby()
+      return
+    }
+
     if (channel.value === 'discover') {
       await loadDiscover()
       return
     }
 
     if (!props.loggedIn || !props.userId) {
-      notes.value = DEMO_NOTES
+      notes.value = []
       return
     }
 
     if (channel.value === 'follow') {
-      // 读扩散：经 Gateway → feed-service → user following-ids + content 笔记
       const res = await feedApi().following(40)
       if (res.body?.code !== 0) {
         notes.value = []
         return
       }
-      const items = res.body.data || []
-      notes.value = mapFeedItems(items)
-      await ensureNames(notes.value.map((n) => n.userId))
-      await loadLikes(notes.value)
-      return
+      notes.value = mapFeedItems(res.body.data || [])
+      void enrichNotes(notes.value)
     }
-
   } finally {
     loading.value = false
   }
@@ -123,7 +148,7 @@ async function ensureNames(userIds) {
         const user = u.body.data
         names.value = {
           ...names.value,
-          [uid]: user.nickname || user.username || `用户${uid}`,
+          [uid]: user.nickname || user.username || '',
         }
         avatars.value = {
           ...avatars.value,
@@ -152,8 +177,11 @@ async function loadLikes(list) {
 }
 
 function openNote(note) {
-  if (note.demo) return
   emit('open-note', note.id)
+}
+
+function goFollowLogin() {
+  emit('need-login')
 }
 </script>
 
@@ -172,22 +200,56 @@ function openNote(note) {
       </button>
     </header>
 
-    <div v-if="channel === 'nearby'" class="empty">
-      <p>附近笔记即将上线</p>
+    <p v-if="channel === 'nearby' && !loading" class="nearby-bar">
+      <template v-if="nearbyMeta.usingFallback">
+        已按附近默认位置展示
+      </template>
+      <template v-else>
+        附近 8km · {{ nearbyMeta.label || '当前位置' }}
+      </template>
+    </p>
+
+    <div v-if="loading" class="skel" aria-busy="true">
+      <div v-for="i in 4" :key="i" class="skel-card" />
     </div>
 
-    <div v-else class="xhs-waterfall">
+    <div v-else-if="notes.length" class="xhs-waterfall">
       <NoteCard
         v-for="n in notes"
         :key="n.id"
         :note="n"
-        :demo="!!n.demo"
-        :author-name="n.demo ? 'FireFly' : names[n.userId]"
-        :author-avatar="n.demo ? '/avatars/ff-01.svg' : avatars[n.userId]"
+        :author-name="names[n.userId]"
+        :author-avatar="avatars[n.userId]"
         :like-count="likes[n.id] || 0"
+        :distance-km="channel === 'nearby' ? n.distanceKm : null"
         @open="openNote"
         @open-profile="(uid) => $emit('open-profile', uid)"
       />
+    </div>
+
+    <div v-else class="empty">
+      <template v-if="channel === 'nearby'">
+        <p class="empty-title">附近还没有笔记</p>
+        <p>发布时带上地点，会出现在附近</p>
+        <button type="button" class="empty-btn" @click="loadFeed">重新定位</button>
+      </template>
+      <template v-else-if="channel === 'follow'">
+        <template v-if="!loggedIn">
+          <p class="empty-title">登录后看关注动态</p>
+          <p>关注感兴趣的人，他们的新笔记会出现在这里</p>
+          <button type="button" class="empty-btn" @click="goFollowLogin">去登录</button>
+        </template>
+        <template v-else>
+          <p class="empty-title">关注流还是空的</p>
+          <p>去搜索页找找感兴趣的作者，关注后再回来看</p>
+          <button type="button" class="empty-btn" @click="$emit('search')">去搜索</button>
+        </template>
+      </template>
+      <template v-else>
+        <p class="empty-title">暂时没有内容</p>
+        <p>稍后再试，或去搜索看看热门关键词</p>
+        <button type="button" class="empty-btn" @click="$emit('search')">去搜索</button>
+      </template>
     </div>
   </div>
 </template>
@@ -260,12 +322,69 @@ function openNote(note) {
   padding: 0.3rem;
 }
 
+.nearby-bar {
+  margin: 0;
+  padding: 0.35rem 0.85rem 0;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.nearby-bar strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.skel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  padding: 0.75rem 0.7rem 1.5rem;
+}
+
+.skel-card {
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  background: linear-gradient(110deg, #f2f2f2 30%, #fafafa 45%, #f2f2f2 60%);
+  background-size: 200% 100%;
+  animation: ff-skel 1.1s ease infinite;
+}
+
+@keyframes ff-skel {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
 .empty {
   display: grid;
   place-items: center;
-  gap: 0.6rem;
-  padding: 4rem 1rem;
+  gap: 0.45rem;
+  padding: 4rem 1.25rem;
   color: var(--ink-2);
+  text-align: center;
+}
+
+.empty-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.empty p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  max-width: 280px;
+}
+
+.empty-btn {
+  margin-top: 0.65rem;
+  padding: 0.45rem 1.15rem;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 
 @media (min-width: 769px) {
@@ -280,5 +399,6 @@ function openNote(note) {
   .channels { gap: 1.8rem; }
   .channels button { font-size: 1rem; }
   .channels button.on { font-size: 1.15rem; }
+  .nearby-bar { padding-left: 0; }
 }
 </style>

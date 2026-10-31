@@ -1,0 +1,40 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:9009}
+
+spring:
+  application:
+    name: im-service
+  config:
+    import: optional:classpath:firefly-observability.yml
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/im?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: im-hikari
+      maximum-pool-size: ${HIKARI_MAX_POOL:8}
+      minimum-idle: ${HIKARI_MIN_IDLE:2}
+      connection-timeout: ${HIKARI_CONNECTION_TIMEOUT:3000}
+      connection-init-sql: SET time_zone = '+08:00'
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD}
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  type-aliases-package: imservice.entity
+
+firefly:
+  internal-auth:
+    enabled: true
+    hmac-secret: ${INTERNAL_HMAC_SECRET}
+    skew-sec: 60
+  outbox:
+    batch-size: 50
+    max-attempts: 20
+    poll-interval-ms: 2000

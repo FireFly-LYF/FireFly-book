@@ -73,12 +73,12 @@ def resolve_citations(
     web_idxs |= w2
 
     cited_notes = [
-        note_candidates[i - 1]
+        note_candidates[i - 1].model_copy(update={"cite_index": i})
         for i in sorted(note_idxs)
         if 1 <= i <= len(note_candidates)
     ]
     cited_webs = [
-        web_candidates[i - 1]
+        web_candidates[i - 1].model_copy(update={"cite_index": i})
         for i in sorted(web_idxs)
         if 1 <= i <= len(web_candidates)
     ]
@@ -119,7 +119,13 @@ def auto_cite_all(
         return CitationResult(text, [], [], True)
     return CitationResult(
         answer=(answer or "").strip(),
-        note_sources=list(note_candidates),
-        web_sources=list(web_candidates),
+        note_sources=[
+            n.model_copy(update={"cite_index": i})
+            for i, n in enumerate(note_candidates, 1)
+        ],
+        web_sources=[
+            w.model_copy(update={"cite_index": i})
+            for i, w in enumerate(web_candidates, 1)
+        ],
         ungrounded=False,
     )

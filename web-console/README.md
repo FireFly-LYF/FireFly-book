@@ -4,6 +4,12 @@
 
 ## 启动
 
+### Docker（推荐）
+
+全栈 Compose 已包含 `web-console`，映射 **5173→80**。构建启动后浏览器打开 http://localhost:5173/（或在 Docker Desktop 点端口）。Nginx 将 `/api`、`/files` 反代到 Gateway。
+
+### 本机热更新
+
 1. MySQL / Redis / RabbitMQ / ES  
 2. Java 服务（9001–9008）  
 3. Gateway：`cd Gateway/gateway && go run ./cmd/gateway`  
@@ -17,7 +23,7 @@ npm run dev
 
 浏览器打开 http://localhost:5173  
 
-Vite 将 `/api`、`/files` 代理到 Gateway `:8080`。
+Vite 将 `/api`、`/files` 代理到 Gateway `:8080`。与 Docker 前端同端口时勿同时占用 5173。
 
 ## 已接入
 
@@ -33,10 +39,22 @@ Vite 将 `/api`、`/files` 代理到 Gateway `:8080`。
 | 搜索 | 笔记/用户搜索 + AI 智能回答（引用溯源，需 assistant-service） |
 | 市集 | 商品浏览/上架、购物车、地址、下单、模拟支付、发货/确认收货/售后 |
 
-## 占位中
+## 演示账号
 
-- 附近（LBS）
-- 全局推荐发现流
-- 私信 IM
-- 个人页编辑资料、获赞总数
-- 发布页：话题 / 地点 / @用户
+```powershell
+# 先有种子笔记（及审核通过）后：
+.\deploy\scripts\seed-demo-test.ps1
+```
+
+登录 **test / test**（登录页可一键填入）。
+
+## 附近（南京）
+
+首页「附近」：浏览器定位，失败则用 **南京·新街口**；`GET /api/feed/nearby`。  
+造数：`.\deploy\scripts\seed-nearby-nanjing.ps1`。发布页可选南京地点或当前位置。
+
+## 占位中 / 建设中
+
+- 私信 IM（Outbox）— 下一阶段
+- 发布页：话题 / @用户
+- 个人页获赞总数

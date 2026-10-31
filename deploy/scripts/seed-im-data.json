@@ -1,0 +1,7 @@
+{
+  "messages": [
+    { "from": "peer", "text": "Hi! Saw your Nanjing notes, love them." },
+    { "from": "demo", "text": "Thanks! Free this weekend for Xuanwu Lake?" },
+    { "from": "peer", "text": "Sat afternoon works. Ping me the meet-up spot." }
+  ]
+}

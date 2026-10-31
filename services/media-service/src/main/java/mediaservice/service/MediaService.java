@@ -5,6 +5,7 @@ import mediaservice.entity.MediaAsset;
 import mediaservice.mapper.MediaAssetMapper;
 import mediaservice.media.ImageProbe;
 import mediaservice.media.MediaUrlSigner;
+import mediaservice.media.VideoProbe;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -46,16 +47,32 @@ public class MediaService {
             throw new IllegalArgumentException("无法读取文件");
         }
 
-        ImageProbe.DetectedImage detected = ImageProbe.detect(head)
-                .orElseThrow(() -> new IllegalArgumentException("只允许上传 JPEG/PNG/GIF/WEBP 图片"));
-
         String original = file.getOriginalFilename();
-        // 客户端扩展名仅作提示，不参与落盘名
-        if (original != null && !original.isBlank() && !ImageProbe.isAllowedClientHint(original)) {
-            throw new IllegalArgumentException("文件扩展名不在白名单内");
+        Optional<ImageProbe.DetectedImage> image = ImageProbe.detect(head);
+        Optional<VideoProbe.DetectedVideo> video = image.isEmpty() ? VideoProbe.detect(head) : Optional.empty();
+
+        String contentType;
+        String extension;
+        if (image.isPresent()) {
+            if (original != null && !original.isBlank() && !ImageProbe.isAllowedClientHint(original)) {
+                throw new IllegalArgumentException("文件扩展名不在白名单内");
+            }
+            contentType = image.get().contentType();
+            extension = image.get().extension();
+        } else if (video.isPresent()) {
+            if (file.getSize() > 100L * 1024 * 1024) {
+                throw new IllegalArgumentException("视频请小于 100MB");
+            }
+            if (original != null && !original.isBlank() && !VideoProbe.isAllowedClientHint(original)) {
+                throw new IllegalArgumentException("视频扩展名不在白名单内");
+            }
+            contentType = video.get().contentType();
+            extension = video.get().extension();
+        } else {
+            throw new IllegalArgumentException("只允许上传图片（JPEG/PNG/GIF/WEBP）或短视频（MP4/WebM）");
         }
 
-        String filename = UUID.randomUUID() + detected.extension();
+        String filename = UUID.randomUUID() + extension;
         String canonicalPath = "/files/" + filename;
 
         try {
@@ -69,7 +86,7 @@ public class MediaService {
         MediaAsset asset = new MediaAsset();
         asset.setUserId(userId);
         asset.setOriginalName(original != null ? original : filename);
-        asset.setContentType(detected.contentType());
+        asset.setContentType(contentType);
         asset.setSizeBytes(file.getSize());
         // 库内只存规范路径，不含签名（签名会过期）
         asset.setUrl(canonicalPath);
@@ -78,7 +95,7 @@ public class MediaService {
         Map<String, Object> result = new HashMap<>();
         result.put("id", asset.getId());
         result.put("url", canonicalPath);
-        result.put("contentType", detected.contentType());
+        result.put("contentType", contentType);
         result.put("accessUrl", mediaUrlSigner.signPath(canonicalPath));
         return result;
     }
@@ -130,8 +147,12 @@ public class MediaService {
         }
         byte[] bytes = Files.readAllBytes(file);
         Optional<ImageProbe.DetectedImage> detected = ImageProbe.detect(bytes);
-        String contentType = detected.map(ImageProbe.DetectedImage::contentType)
-                .orElse(contentTypeFromExtension(path));
+        String contentType = detected.map(ImageProbe.DetectedImage::contentType).orElse(null);
+        if (contentType == null) {
+            contentType = VideoProbe.detect(bytes)
+                    .map(VideoProbe.DetectedVideo::contentType)
+                    .orElse(contentTypeFromExtension(path));
+        }
         return new MediaFileContent(bytes, contentType);
     }
 
@@ -145,6 +166,15 @@ public class MediaService {
         }
         if (lower.endsWith(".webp")) {
             return "image/webp";
+        }
+        if (lower.endsWith(".mp4")) {
+            return "video/mp4";
+        }
+        if (lower.endsWith(".webm")) {
+            return "video/webm";
+        }
+        if (lower.endsWith(".mov")) {
+            return "video/quicktime";
         }
         return "image/jpeg";
     }

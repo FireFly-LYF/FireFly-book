@@ -30,12 +30,15 @@ class NoteSource(BaseModel):
     title: str | None = None
     snippet: str | None = None
     cover_url: str | None = Field(default=None, alias="coverUrl")
+    # 对应正文 [笔记N] 的 N；仅实引子集回填，供前端可点引用
+    cite_index: int | None = Field(default=None, alias="citeIndex")
 
 
 class WebSource(BaseModel):
     title: str
     url: str
     snippet: str | None = None
+    cite_index: int | None = Field(default=None, alias="citeIndex")
 
 
 class SearchData(BaseModel):

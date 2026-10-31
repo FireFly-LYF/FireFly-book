@@ -1,6 +1,6 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { toLocalMediaUrl } from '../api'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { getAuthEpoch, onAuthChange, toLocalMediaUrl } from '../api'
 import UserAvatar from './UserAvatar.vue'
 import SignedImg from './SignedImg.vue'
 
@@ -10,14 +10,32 @@ const props = defineProps({
   authorAvatar: { type: String, default: '' },
   likeCount: { type: Number, default: 0 },
   demo: { type: Boolean, default: false },
+  distanceKm: { type: [Number, null], default: null },
 })
 
 const emit = defineEmits(['open', 'open-profile'])
 
 const cover = computed(() => toLocalMediaUrl(props.note.coverUrl))
+const mediaCount = computed(() => Number(props.note.mediaCount) || 0)
+const isVideo = computed(
+  () =>
+    props.note.mediaKind === 'video' ||
+    /\.(mp4|webm|mov)(\?|$)/i.test(String(props.note.coverUrl || '')),
+)
 const coverFailed = ref(false)
+const authEpoch = ref(getAuthEpoch())
+let offAuth = null
+onMounted(() => {
+  offAuth = onAuthChange((epoch) => {
+    authEpoch.value = epoch
+    coverFailed.value = false
+  })
+})
+onUnmounted(() => {
+  if (offAuth) offAuth()
+})
 watch(
-  () => props.note?.coverUrl,
+  () => [props.note?.coverUrl, authEpoch.value],
   () => {
     coverFailed.value = false
   },
@@ -51,18 +69,24 @@ function onAuthorClick(e) {
         <span class="art">{{ artText }}</span>
       </div>
       <span v-if="demo" class="demo">示例</span>
+      <span v-if="isVideo" class="media-badge video">视频</span>
+      <span v-else-if="mediaCount > 1" class="media-badge">{{ mediaCount }}图</span>
+      <span v-if="distanceKm != null && !Number.isNaN(Number(distanceKm))" class="dist">
+        {{ Number(distanceKm) < 1 ? `${Math.round(Number(distanceKm) * 1000)}m` : `${Number(distanceKm).toFixed(1)}km` }}
+      </span>
     </div>
     <div class="body">
       <h3>{{ title }}</h3>
+      <p v-if="note.placeName" class="place">{{ note.placeName }}</p>
       <div class="meta">
         <button type="button" class="author" @click="onAuthorClick">
           <UserAvatar
             :user-id="note.userId"
             :avatar-url="authorAvatar"
-            :name="authorName || `用户${note.userId}`"
+            :name="authorName || ' '"
             :size="18"
           />
-          <span class="name">{{ authorName || `用户${note.userId}` }}</span>
+          <span class="name">{{ authorName || ' ' }}</span>
         </button>
         <span class="likes">
           <svg class="heart" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
@@ -74,7 +98,7 @@ function onAuthorClick(e) {
               d="M12 20.5s-7.2-4.6-8.7-8.9C2.2 8.7 3.7 5.8 6.6 5.3c1.7-.3 3.4.5 4.4 1.8 1-1.3 2.7-2.1 4.4-1.8 2.9.5 4.4 3.4 3.3 6.3C19.2 15.9 12 20.5 12 20.5z"
             />
           </svg>
-          {{ likeCount || '赞' }}
+          {{ Number(likeCount) || 0 }}
         </span>
       </div>
     </div>
@@ -155,7 +179,45 @@ function onAuthorClick(e) {
   border-radius: 4px;
 }
 
+.media-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+}
+.media-badge.video {
+  background: rgba(255, 36, 66, 0.88);
+}
+
+.dist {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  top: auto;
+  right: auto;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+}
+
 .body { padding: 0.55rem 0.6rem 0.7rem; }
+
+.place {
+  margin: 0.25rem 0 0;
+  font-size: 0.7rem;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 h3 {
   margin: 0;

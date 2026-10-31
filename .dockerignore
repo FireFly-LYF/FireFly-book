@@ -1,0 +1,13 @@
+.git
+.firefly-dev
+**/node_modules
+**/dist
+**/target
+**/.idea
+**/.vscode
+bench
+*.md
+!web-console/README.md
+.env
+.env.*
+!.env.example

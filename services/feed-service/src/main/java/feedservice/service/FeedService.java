@@ -37,9 +37,29 @@ public class FeedService {
         this.timelineCache = timelineCache;
     }
 
-    /** 发现流：全站最新已发布笔记（新账号无需关注即可浏览） */
+    /** 发现流：content 侧已做热度/新鲜度混排 */
     public List<FeedItem> discoverFeed(int size) {
-        return contentClient.listDiscover(size);
+        List<FeedItem> items = contentClient.listDiscover(size);
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        // 二次轻混排：获赞优先，其次多图/视频
+        return items.stream()
+                .sorted(Comparator
+                        .comparingInt((FeedItem i) -> {
+                            int likes = i.getLikeCount() != null ? i.getLikeCount() : 0;
+                            int media = i.getMediaCount() != null ? i.getMediaCount() : 0;
+                            int video = "video".equals(i.getMediaKind()) ? 3 : 0;
+                            return likes * 3 + media + video;
+                        })
+                        .reversed()
+                        .thenComparing(FeedItem::getNoteId, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    /** 附近流：按坐标半径查已发布笔记 */
+    public List<FeedItem> nearbyFeed(double lat, double lng, double radiusKm, int size) {
+        return contentClient.listNearby(lat, lng, radiusKm, size);
     }
 
     public List<FeedItem> followingFeed(Long userId, int size) {

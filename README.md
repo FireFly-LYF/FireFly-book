@@ -105,10 +105,13 @@ notepad .env
 docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
 # 覆盖重建（停本机进程 + force-recreate，保留卷）：
 # .\deploy\scripts\redeploy.ps1
-cd web-console; npm install; npm run dev
 ```
 
-造数：`.\deploy\scripts\seed-notes.ps1`（可选 `-NoCovers`）；评论（含楼中楼）：`.\deploy\scripts\seed-comments.ps1`；市集：`.\deploy\scripts\seed-market.ps1`。种子账号如 `seed_momo` / `123456`。
+前端已含在 Compose：http://localhost:5173/（Docker Desktop 点 `5173` 即可）。本机热更新仍可用：`cd web-console; npm run dev`。
+
+造数：`.\deploy\scripts\seed-notes.ps1`（可选 `-NoCovers`）；评论（含楼中楼）：`.\deploy\scripts\seed-comments.ps1`；市集：`.\deploy\scripts\seed-market.ps1`。种子账号如 `seed_momo` / `123456`。  
+演示账号：`.\deploy\scripts\seed-demo-test.ps1` → **test / test**（关注种子作者、笔记、赞藏、南京收货地址）。需笔记已过审后发现流才有内容。  
+本机造数后封面在 `MEDIA_STORAGE_DIR`，进 Docker 需同步：`.\deploy\scripts\sync-media-to-docker.ps1`（`redeploy.ps1` 会自动做）。
 
 ### 4. AI（审核 / 搜索助手）
 

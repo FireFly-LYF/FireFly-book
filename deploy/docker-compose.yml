@@ -41,6 +41,8 @@ services:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    command: ["--default-time-zone=+08:00", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     volumes:
       - mysql-data:/var/lib/mysql
       - ./mysql-init:/docker-entrypoint-initdb.d:ro
@@ -227,6 +229,22 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  im-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: im-service
+    environment:
+      <<: *java-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      notify-service:
+        condition: service_started
+    restart: unless-stopped
+
   gateway:
     build:
       context: ../Gateway
@@ -250,7 +268,19 @@ services:
       - feed-service
       - search-service
       - market-service
+      - im-service
       - redis
+    restart: unless-stopped
+
+  # 生产静态站：浏览器打开 http://localhost:5173 （Docker Desktop 点端口即可）
+  web-console:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web-console
+    ports:
+      - "5173:80"
+    depends_on:
+      - gateway
     restart: unless-stopped
 
 volumes:

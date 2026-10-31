@@ -37,14 +37,14 @@ public class MediaController {
         }
     }
 
-    /** 为规范路径签发短期 accessUrl，供 &lt;img&gt; 使用。 */
+    /**
+     * 为规范路径签发短期 accessUrl，供 &lt;img&gt; 使用。
+     * 发现流未登录也可看封面：UUID 路径枚举成本高，与 Gateway 白名单一致允许匿名签发。
+     */
     @PostMapping("/sign")
     public ApiResponse<Map<String, Object>> sign(
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
             @RequestBody SignRequest req) {
-        if (userId == null) {
-            return ApiResponse.fail(40100, "未登录");
-        }
         try {
             List<String> paths = req == null || req.getPaths() == null ? List.of() : req.getPaths();
             if (paths.isEmpty() && req != null && req.getPath() != null) {

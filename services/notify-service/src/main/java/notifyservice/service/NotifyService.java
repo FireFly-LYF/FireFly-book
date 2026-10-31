@@ -19,7 +19,8 @@ public class NotifyService {
 
     private static final Set<String> ALLOWED_TYPES = Set.of(
             "LIKE", "COMMENT", "FOLLOW",
-            "ORDER_PAID", "ORDER_CANCELLED", "ORDER_REFUNDED");
+            "ORDER_PAID", "ORDER_CANCELLED", "ORDER_REFUNDED",
+            "IM");
 
     private final NotificationMapper notificationMapper;
     private final NotifyListCache notifyListCache;
@@ -44,7 +45,8 @@ public class NotifyService {
         }
         String type = req.getType().trim().toUpperCase();
         if (!ALLOWED_TYPES.contains(type)) {
-            throw new IllegalArgumentException("type 仅支持 LIKE/COMMENT/FOLLOW/ORDER_PAID/ORDER_CANCELLED/ORDER_REFUNDED");
+            throw new IllegalArgumentException(
+                    "type 仅支持 LIKE/COMMENT/FOLLOW/ORDER_PAID/ORDER_CANCELLED/ORDER_REFUNDED/IM");
         }
         if (req.getUserId().equals(req.getFromUserId())) {
             throw new IllegalArgumentException("不能给自己发通知");

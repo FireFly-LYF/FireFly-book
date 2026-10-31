@@ -8,8 +8,8 @@ import java.util.List;
 @Mapper
 public interface NoteMapper {
 
-    @Insert("INSERT INTO note(user_id, title, content, cover_url, status, idem_key) " +
-            "VALUES(#{userId}, #{title}, #{content}, #{coverUrl}, #{status}, #{idemKey})")
+    @Insert("INSERT INTO note(user_id, title, content, cover_url, lat, lng, place_name, status, idem_key) " +
+            "VALUES(#{userId}, #{title}, #{content}, #{coverUrl}, #{lat}, #{lng}, #{placeName}, #{status}, #{idemKey})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Note note);
 
@@ -24,9 +24,42 @@ public interface NoteMapper {
                           @Param("limit") int limit,
                           @Param("offset") int offset);
 
+    @Select("""
+            SELECT COUNT(1) AS noteCount,
+                   COALESCE(SUM(like_count), 0) AS likeCount
+            FROM note
+            WHERE user_id=#{userId} AND status=1
+            """)
+    java.util.Map<String, Object> statsByUser(@Param("userId") Long userId);
+
     /** 发现流：全站已发布笔记，按时间倒序 */
     @Select("SELECT * FROM note WHERE status = 1 ORDER BY id DESC LIMIT #{limit} OFFSET #{offset}")
     List<Note> listDiscover(@Param("limit") int limit, @Param("offset") int offset);
+
+    /**
+     * 附近流：已发布且带坐标，按球面距离升序。
+     * distance_km 映射到 Note.distanceKm（map-underscore-to-camel-case）。
+     */
+    @Select("""
+            SELECT n.*,
+              (6371 * 2 * ASIN(SQRT(
+                POWER(SIN(RADIANS((n.lat - #{lat}) / 2)), 2) +
+                COS(RADIANS(#{lat})) * COS(RADIANS(n.lat)) *
+                POWER(SIN(RADIANS((n.lng - #{lng}) / 2)), 2)
+              ))) AS distance_km
+            FROM note n
+            WHERE n.status = 1
+              AND n.lat IS NOT NULL
+              AND n.lng IS NOT NULL
+            HAVING distance_km <= #{radiusKm}
+            ORDER BY distance_km ASC, n.id DESC
+            LIMIT #{limit}
+            """)
+    List<Note> listNearby(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            @Param("radiusKm") double radiusKm,
+            @Param("limit") int limit);
 
     /** 本人主页：已发布 + 审核中（不含拒绝） */
     @Select("SELECT * FROM note WHERE user_id=#{userId} AND status IN (1, 2) ORDER BY id DESC LIMIT #{limit} OFFSET #{offset}")

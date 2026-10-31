@@ -1,8 +1,18 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { noteApi, socialApi, toLocalMediaUrl, userApi, newIdempotencyKey } from '../api'
+import {
+  noteApi,
+  socialApi,
+  toLocalMediaUrl,
+  userApi,
+  newIdempotencyKey,
+  resolveSignedMediaUrl,
+  searchApi,
+} from '../api'
 import UserAvatar from './UserAvatar.vue'
 import SignedImg from './SignedImg.vue'
+import { formatRelativeTime } from '../time'
+import { formatNoteContent, isVideoUrl } from '../richText'
 
 const props = defineProps({
   noteId: { type: [Number, String], default: null },
@@ -10,7 +20,7 @@ const props = defineProps({
   loggedIn: Boolean,
   currentUserId: { type: [Number, String, null], default: null },
 })
-const emit = defineEmits(['close', 'need-login', 'toast', 'open-profile'])
+const emit = defineEmits(['close', 'need-login', 'toast', 'open-profile', 'open-topic', 'deleted'])
 
 const detail = ref(null)
 const author = ref(null)
@@ -60,6 +70,24 @@ const mediaIndex = ref(0)
 const activeMedia = computed(
   () => mediaList.value[mediaIndex.value] || mediaList.value[0] || '',
 )
+const activeIsVideo = computed(() => isVideoUrl(activeMedia.value))
+const signedActiveMedia = ref('')
+const touchX = ref(null)
+const editing = ref(false)
+const editForm = ref({ title: '', content: '' })
+const savingEdit = ref(false)
+
+watch(activeMedia, async (url) => {
+  signedActiveMedia.value = ''
+  if (!url) return
+  try {
+    signedActiveMedia.value = (await resolveSignedMediaUrl(url)) || url
+  } catch {
+    signedActiveMedia.value = url
+  }
+})
+
+const contentHtml = computed(() => formatNoteContent(detail.value?.content || ''))
 
 /** 楼中楼：一级 + 挂在其下的二级 */
 const commentThreads = computed(() => {
@@ -240,13 +268,126 @@ function goAuthor() {
   if (!uid) return
   emit('open-profile', Number(uid))
 }
+
+function onTouchStart(e) {
+  touchX.value = e.changedTouches?.[0]?.clientX ?? null
+}
+function onTouchEnd(e) {
+  const start = touchX.value
+  touchX.value = null
+  if (start == null || mediaList.value.length <= 1) return
+  const end = e.changedTouches?.[0]?.clientX
+  if (end == null) return
+  const dx = end - start
+  if (Math.abs(dx) < 40) return
+  if (dx < 0) mediaIndex.value = Math.min(mediaList.value.length - 1, mediaIndex.value + 1)
+  else mediaIndex.value = Math.max(0, mediaIndex.value - 1)
+}
+
+function onContentClick(e) {
+  const topic = e.target?.closest?.('[data-topic]')
+  if (topic) {
+    emit('open-topic', topic.getAttribute('data-topic'))
+    return
+  }
+  const mention = e.target?.closest?.('[data-mention]')
+  if (mention) {
+    openMention(mention.getAttribute('data-mention'))
+  }
+}
+
+async function openMention(name) {
+  if (!name) return
+  try {
+    const res = await searchApi().users(name)
+    const list = res.body?.data || []
+    const hit =
+      list.find((u) => u.username === name || u.nickname === name) || list[0]
+    if (hit?.id) emit('open-profile', hit.id)
+    else emit('toast', `未找到用户 @${name}`)
+  } catch {
+    emit('toast', '搜索用户失败')
+  }
+}
+
+async function shareNote() {
+  const title = detail.value?.title || 'FireFly 笔记'
+  const url = `${location.origin}${location.pathname}#note=${props.noteId}`
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, text: detail.value?.content || title, url })
+      return
+    }
+  } catch {
+    /* fallthrough */
+  }
+  try {
+    await navigator.clipboard.writeText(url)
+    emit('toast', '链接已复制')
+  } catch {
+    emit('toast', url)
+  }
+}
+
+function startEdit() {
+  editForm.value = {
+    title: detail.value?.title || '',
+    content: detail.value?.content || '',
+  }
+  editing.value = true
+}
+
+async function saveEdit() {
+  if (!props.noteId) return
+  savingEdit.value = true
+  try {
+    const res = await noteApi().update(props.noteId, {
+      title: editForm.value.title,
+      content: editForm.value.content,
+    })
+    if (res.body?.code !== 0) {
+      emit('toast', res.body?.message || '保存失败')
+      return
+    }
+    detail.value = { ...detail.value, ...res.body.data }
+    editing.value = false
+    emit('toast', '已保存')
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+async function removeNote() {
+  if (!props.noteId) return
+  if (!confirm('确定删除这篇笔记？')) return
+  const res = await noteApi().remove(props.noteId)
+  if (res.body?.code !== 0) {
+    emit('toast', res.body?.message || '删除失败')
+    return
+  }
+  emit('toast', '已删除')
+  emit('deleted', props.noteId)
+  emit('close')
+}
 </script>
 
 <template>
   <div v-if="open" class="mask" @click.self="$emit('close')">
     <div class="panel">
-      <div class="cover" :class="{ empty: !activeMedia }">
-        <SignedImg v-if="activeMedia" :src="activeMedia" alt="" />
+      <div
+        class="cover"
+        :class="{ empty: !activeMedia }"
+        @touchstart.passive="onTouchStart"
+        @touchend.passive="onTouchEnd"
+      >
+        <video
+          v-if="activeIsVideo && (signedActiveMedia || activeMedia)"
+          :src="signedActiveMedia || activeMedia"
+          controls
+          playsinline
+          preload="metadata"
+        />
+        <SignedImg v-else-if="activeMedia" :src="activeMedia" alt="" />
         <div v-else class="cover-ph">{{ (detail?.title || '笔记').slice(0, 1) }}</div>
         <div v-if="mediaList.length > 1" class="media-nav">
           <button
@@ -257,7 +398,15 @@ function goAuthor() {
           >
             ‹
           </button>
-          <span class="media-dots">{{ mediaIndex + 1 }} / {{ mediaList.length }}</span>
+          <span class="media-dots">
+            <i
+              v-for="(_, di) in mediaList"
+              :key="di"
+              class="dot"
+              :class="{ on: di === mediaIndex }"
+            />
+            <em>{{ mediaIndex + 1 }}/{{ mediaList.length }}</em>
+          </span>
           <button
             type="button"
             class="nav-btn"
@@ -273,15 +422,49 @@ function goAuthor() {
       <div class="side">
         <header>
           <button type="button" class="back" @click="$emit('close')">←</button>
-          <strong>笔记详情</strong>
+          <strong>{{ author?.nickname || author?.username || '笔记' }}</strong>
           <span />
         </header>
 
         <div v-if="loading" class="muted pad">加载中…</div>
         <div v-else-if="detail" class="scroll">
           <div class="content">
-            <h2>{{ detail.title || '无标题' }}</h2>
-            <p class="text">{{ detail.content }}</p>
+            <template v-if="editing">
+              <input v-model="editForm.title" class="edit-title" maxlength="40" />
+              <textarea v-model="editForm.content" class="edit-body" rows="6" />
+              <div class="edit-actions">
+                <button type="button" class="ghost" @click="editing = false">取消</button>
+                <button type="button" class="save" :disabled="savingEdit" @click="saveEdit">
+                  {{ savingEdit ? '保存中…' : '保存' }}
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              <div class="title-row">
+                <h2>{{ detail.title || '无标题' }}</h2>
+                <div class="title-actions">
+                  <button type="button" class="icon-btn" title="分享" @click="shareNote">分享</button>
+                  <button
+                    v-if="isOwnNote"
+                    type="button"
+                    class="icon-btn"
+                    @click="startEdit"
+                  >
+                    编辑
+                  </button>
+                  <button
+                    v-if="isOwnNote"
+                    type="button"
+                    class="icon-btn danger"
+                    @click="removeNote"
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+              <p v-if="detail.createdAt" class="meta-time">{{ formatRelativeTime(detail.createdAt) }}</p>
+              <p class="text rich" v-html="contentHtml" @click="onContentClick" />
+            </template>
             <div class="author-row">
               <button type="button" class="author-hit" @click="goAuthor">
                 <UserAvatar
@@ -323,7 +506,10 @@ function goAuthor() {
                   <div class="c-body">
                     <strong>{{ commentNick(t.root) }}</strong>
                     <span>{{ t.root.content }}</span>
-                    <button type="button" class="reply-btn" @click="startReply(t.root)">回复</button>
+                    <div class="c-meta">
+                      <em>{{ formatRelativeTime(t.root.createdAt) }}</em>
+                      <button type="button" class="reply-btn" @click="startReply(t.root)">回复</button>
+                    </div>
                   </div>
                 </div>
                 <div v-if="t.replies.length" class="replies">
@@ -341,7 +527,10 @@ function goAuthor() {
                           回复 <em>@{{ r.replyToNickname }}</em>：
                         </template>{{ r.content }}
                       </span>
-                      <button type="button" class="reply-btn" @click="startReply(r)">回复</button>
+                      <div class="c-meta">
+                        <em>{{ formatRelativeTime(r.createdAt) }}</em>
+                        <button type="button" class="reply-btn" @click="startReply(r)">回复</button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -451,7 +640,8 @@ function goAuthor() {
 }
 
 /* SignedImg 是子组件，scoped 必须用 :deep 才能作用到内部 img */
-.cover :deep(img) {
+.cover :deep(img),
+.cover video {
   display: block;
   width: 100%;
   max-height: 42vh;
@@ -489,6 +679,70 @@ function goAuthor() {
   line-height: 1;
   cursor: pointer;
 }
+.media-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: #fff;
+  font-size: 0.72rem;
+}
+.media-dots .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+}
+.media-dots .dot.on { background: #fff; width: 7px; height: 7px; }
+.media-dots em { font-style: normal; margin-left: 0.25rem; opacity: 0.85; }
+
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+.title-row h2 { flex: 1; margin: 0; }
+.title-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.icon-btn {
+  border: none;
+  background: #f5f5f5;
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.icon-btn.danger { color: var(--brand); }
+.edit-title, .edit-body {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.5rem;
+  font: inherit;
+}
+.edit-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-bottom: 0.75rem; }
+.edit-actions .save {
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+}
+.edit-actions .ghost {
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+}
+.text.rich :deep(.rt-tag),
+.text.rich :deep(.rt-mention) {
+  border: none;
+  background: transparent;
+  color: var(--brand);
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
 
 .media-nav .nav-btn:disabled {
   opacity: 0.35;
@@ -507,10 +761,11 @@ function goAuthor() {
   min-height: 180px;
   display: grid;
   place-items: center;
-  font-size: 2.4rem;
+  font-size: 2rem;
   font-weight: 700;
-  color: #fff;
-  background: linear-gradient(145deg, #ff6b81, #ff2442);
+  color: #ff2442;
+  opacity: 0.45;
+  background: linear-gradient(160deg, #ffe8ec 0%, #f7f7f7 50%, #eee 100%);
 }
 
 .close-float { display: none; }
@@ -542,8 +797,14 @@ header strong { text-align: center; }
 .content { padding: 0.9rem 1rem; }
 
 h2 {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.35rem;
   font-size: 1.1rem;
+}
+
+.meta-time {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  color: var(--ink-3);
 }
 
 .text {
@@ -671,6 +932,19 @@ h2 {
   font-style: normal;
   color: var(--ink-2);
   font-weight: 600;
+}
+
+.c-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.c-meta em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--ink-3);
 }
 
 .reply-btn {

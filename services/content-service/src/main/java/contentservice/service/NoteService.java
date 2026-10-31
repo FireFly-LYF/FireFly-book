@@ -25,6 +25,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -80,11 +81,16 @@ public class NoteService {
             }
         }
 
+        List<String> urls = normalizeMediaUrls(req.getMediaUrls(), req.getCoverUrl());
+        String mediaKind = normalizeMediaKind(req.getMediaKind(), urls);
+        validateMediaCombo(urls, mediaKind);
+
         Note n = new Note();
         n.setUserId(userId);
         n.setTitle(req.getTitle());
         n.setContent(req.getContent());
-        n.setCoverUrl(req.getCoverUrl());
+        n.setCoverUrl(urls.isEmpty() ? req.getCoverUrl() : urls.get(0));
+        applyLocation(n, req.getLat(), req.getLng(), req.getPlaceName());
         // 先审后发：入库为审核中，通过后才发 note.published 进 Feed/ES
         n.setStatus(Note.STATUS_PENDING);
         n.setIdemKey(idemKey);
@@ -98,23 +104,18 @@ public class NoteService {
             throw e;
         }
 
-        List<String> urls = req.getMediaUrls();
-        if (urls != null) {
-            for (int i = 0; i < urls.size(); i++) {
-                NoteMedia m = new NoteMedia();
-                m.setNoteId(n.getId());
-                m.setMediaUrl(urls.get(i));
-                m.setSortNo(i);
-                noteMediaMapper.insert(m);
-            }
+        for (int i = 0; i < urls.size(); i++) {
+            NoteMedia m = new NoteMedia();
+            m.setNoteId(n.getId());
+            m.setMediaUrl(urls.get(i));
+            m.setSortNo(i);
+            noteMediaMapper.insert(m);
         }
 
+        n.setMediaCount(urls.size());
+        n.setMediaKind(mediaKind);
         noteCache.put(n);
-        if (urls != null) {
-            noteCache.putMedia(n.getId(), urls);
-        } else {
-            noteCache.putMedia(n.getId(), List.of());
-        }
+        noteCache.putMedia(n.getId(), urls);
         noteListCache.evictUser(userId);
         List<String> mediaUrls = urls != null ? List.copyOf(urls) : List.of();
         enqueueAndKick(
@@ -207,12 +208,88 @@ public class NoteService {
     /** 发现流：全站最新已发布笔记（新账号默认可看） */
     public List<Note> listDiscover(int size) {
         int limit = size <= 0 ? 20 : Math.min(size, 50);
-        List<Note> notes = noteMapper.listDiscover(limit, 0);
+        // 多取一些再按热度/新鲜度混排
+        List<Note> notes = noteMapper.listDiscover(Math.min(limit * 2, 80), 0);
         if (notes == null || notes.isEmpty()) {
             return List.of();
         }
         noteCache.putMany(notes);
+        fillMediaMeta(notes);
+        notes.sort(Comparator
+                .comparingInt((Note n) -> discoverScore(n))
+                .reversed()
+                .thenComparing(Note::getId, Comparator.nullsLast(Comparator.reverseOrder())));
+        if (notes.size() > limit) {
+            return List.copyOf(notes.subList(0, limit));
+        }
         return notes;
+    }
+
+    private static int discoverScore(Note n) {
+        int likes = n.getLikeCount() != null ? n.getLikeCount() : 0;
+        int media = n.getMediaCount() != null ? n.getMediaCount() : 0;
+        int videoBoost = "video".equals(n.getMediaKind()) ? 3 : 0;
+        return likes * 3 + media + videoBoost;
+    }
+
+    public Map<String, Long> statsByUser(Long userId) {
+        Map<String, Object> row = noteMapper.statsByUser(userId);
+        long noteCount = 0;
+        long likeCount = 0;
+        if (row != null) {
+            noteCount = toLong(row.get("noteCount")) != null ? toLong(row.get("noteCount")) : 0;
+            // MyBatis 可能返回 note_count
+            if (noteCount == 0 && row.get("note_count") != null) {
+                Long v = toLong(row.get("note_count"));
+                noteCount = v != null ? v : 0;
+            }
+            Long lc = toLong(row.get("likeCount"));
+            if (lc == null) {
+                lc = toLong(row.get("like_count"));
+            }
+            likeCount = lc != null ? lc : 0;
+        }
+        Map<String, Long> out = new HashMap<>();
+        out.put("noteCount", noteCount);
+        out.put("likeCount", likeCount);
+        return out;
+    }
+
+    /**
+     * 附近流：按距离排序的已发布笔记。
+     * @param radiusKm 半径公里，默认 8，上限 50
+     */
+    public List<Note> listNearby(double lat, double lng, double radiusKm, int size) {
+        if (Double.isNaN(lat) || Double.isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            throw new IllegalArgumentException("lat/lng 无效");
+        }
+        double radius = radiusKm <= 0 ? 8 : Math.min(radiusKm, 50);
+        int limit = size <= 0 ? 40 : Math.min(size, 50);
+        List<Note> notes = noteMapper.listNearby(lat, lng, radius, limit);
+        if (notes == null || notes.isEmpty()) {
+            return List.of();
+        }
+        noteCache.putMany(notes);
+        fillMediaMeta(notes);
+        return notes;
+    }
+
+    private static void applyLocation(Note n, Double lat, Double lng, String placeName) {
+        if (lat == null || lng == null) {
+            return;
+        }
+        if (Double.isNaN(lat) || Double.isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            throw new IllegalArgumentException("lat/lng 无效");
+        }
+        n.setLat(lat);
+        n.setLng(lng);
+        if (placeName != null) {
+            String p = placeName.trim();
+            if (p.length() > 64) {
+                p = p.substring(0, 64);
+            }
+            n.setPlaceName(p.isEmpty() ? null : p);
+        }
     }
 
     public List<Note> listByUser(Long userId, int page, int size, Long viewerUserId) {
@@ -241,6 +318,7 @@ public class NoteService {
             noteListCache.putWall(userId, page, size, notes);
         }
         noteCache.putMany(notes);
+        fillMediaMeta(notes);
         return notes;
     }
 
@@ -291,6 +369,7 @@ public class NoteService {
                 (Note note) -> note.getId(),
                 Comparator.nullsLast(Comparator.naturalOrder()))
             .reversed());
+        fillMediaMeta(out);
         return out;
     }
 
@@ -323,6 +402,7 @@ public class NoteService {
                 out.add(n);
             }
         }
+        fillMediaMeta(out);
         return out;
     }
 
@@ -337,6 +417,24 @@ public class NoteService {
         }
         if (req.getCoverUrl() != null) {
             n.setCoverUrl(req.getCoverUrl());
+        }
+        List<String> mediaUrls = req.getMediaUrls();
+        if (mediaUrls != null) {
+            List<String> urls = normalizeMediaUrls(mediaUrls, req.getCoverUrl() != null ? req.getCoverUrl() : n.getCoverUrl());
+            String mediaKind = normalizeMediaKind(req.getMediaKind(), urls);
+            validateMediaCombo(urls, mediaKind);
+            noteMediaMapper.deleteByNoteId(noteId);
+            for (int i = 0; i < urls.size(); i++) {
+                NoteMedia m = new NoteMedia();
+                m.setNoteId(noteId);
+                m.setMediaUrl(urls.get(i));
+                m.setSortNo(i);
+                noteMediaMapper.insert(m);
+            }
+            if (!urls.isEmpty()) {
+                n.setCoverUrl(urls.get(0));
+            }
+            noteCache.putMedia(noteId, urls);
         }
         noteMapper.update(n);
         noteCache.evict(noteId);
@@ -432,8 +530,10 @@ public class NoteService {
 
     private NoteDetailResponse toDetail(Note note) {
         NoteDetailResponse r = new NoteDetailResponse();
-        r.setNote(note);
         List<String> urls = listMediaUrls(note.getId());
+        note.setMediaCount(urls.size());
+        note.setMediaKind(inferMediaKind(urls));
+        r.setNote(note);
         r.setMediaUrls(urls);
         return r;
     }
@@ -448,6 +548,139 @@ public class NoteService {
             noteCache.putMedia(noteId, urls);
         }
         return urls;
+    }
+
+    private void fillMediaMeta(List<Note> notes) {
+        if (notes == null || notes.isEmpty()) {
+            return;
+        }
+        List<Long> ids = notes.stream()
+                .map(Note::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        Map<Long, Integer> counts = new HashMap<>();
+        List<Map<String, Object>> rows = noteMediaMapper.countGrouped(ids);
+        if (rows != null) {
+            for (Map<String, Object> row : rows) {
+                Long id = toLong(row.get("id"));
+                Integer c = toInt(row.get("c"));
+                if (id != null && c != null) {
+                    counts.put(id, c);
+                }
+            }
+        }
+        for (Note n : notes) {
+            if (n.getId() == null) {
+                continue;
+            }
+            int c = counts.getOrDefault(n.getId(), 0);
+            if (c == 0 && n.getCoverUrl() != null && !n.getCoverUrl().isBlank()) {
+                c = 1;
+            }
+            n.setMediaCount(c);
+            List<String> cached = noteCache.getMedia(n.getId());
+            if (cached != null && !cached.isEmpty()) {
+                n.setMediaKind(inferMediaKind(cached));
+            } else if (isVideoUrl(n.getCoverUrl())) {
+                n.setMediaKind("video");
+            } else {
+                n.setMediaKind("image");
+            }
+        }
+    }
+
+    private static List<String> normalizeMediaUrls(List<String> mediaUrls, String coverUrl) {
+        List<String> urls = new ArrayList<>();
+        if (mediaUrls != null) {
+            for (String u : mediaUrls) {
+                if (u == null || u.isBlank()) {
+                    continue;
+                }
+                String t = u.trim();
+                if (!urls.contains(t)) {
+                    urls.add(t);
+                }
+            }
+        }
+        if (urls.isEmpty() && coverUrl != null && !coverUrl.isBlank()) {
+            urls.add(coverUrl.trim());
+        }
+        if (urls.size() > 9) {
+            throw new IllegalArgumentException("最多 9 张图片");
+        }
+        return urls;
+    }
+
+    private static String normalizeMediaKind(String raw, List<String> urls) {
+        if (raw != null && "video".equalsIgnoreCase(raw.trim())) {
+            return "video";
+        }
+        return inferMediaKind(urls);
+    }
+
+    private static String inferMediaKind(List<String> urls) {
+        if (urls == null || urls.isEmpty()) {
+            return "image";
+        }
+        return isVideoUrl(urls.get(0)) ? "video" : "image";
+    }
+
+    private static void validateMediaCombo(List<String> urls, String mediaKind) {
+        if ("video".equals(mediaKind)) {
+            if (urls.size() != 1 || !isVideoUrl(urls.get(0))) {
+                throw new IllegalArgumentException("视频笔记仅支持 1 个视频文件");
+            }
+            return;
+        }
+        for (String u : urls) {
+            if (isVideoUrl(u)) {
+                throw new IllegalArgumentException("图文笔记不能混入视频，请改用视频模式");
+            }
+        }
+    }
+
+    static boolean isVideoUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        String path = url.trim().toLowerCase();
+        int q = path.indexOf('?');
+        if (q >= 0) {
+            path = path.substring(0, q);
+        }
+        return path.endsWith(".mp4") || path.endsWith(".webm") || path.endsWith(".mov");
+    }
+
+    private static Long toLong(Object v) {
+        if (v == null) {
+            return null;
+        }
+        if (v instanceof Number n) {
+            return n.longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(v));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Integer toInt(Object v) {
+        if (v == null) {
+            return null;
+        }
+        if (v instanceof Number n) {
+            return n.intValue();
+        }
+        try {
+            return Integer.parseInt(String.valueOf(v));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private Note requireOwned(Long userId, Long noteId) {

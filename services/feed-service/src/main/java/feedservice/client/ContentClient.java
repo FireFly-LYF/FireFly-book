@@ -92,6 +92,26 @@ public class ContentClient {
         }
     }
 
+    /** 附近流 */
+    public List<FeedItem> listNearby(double lat, double lng, double radiusKm, int size) {
+        try {
+            int limit = size <= 0 ? 40 : Math.min(size, 50);
+            String url = contentBaseUrl + "/api/note/nearby?lat=" + lat
+                    + "&lng=" + lng
+                    + "&radiusKm=" + radiusKm
+                    + "&size=" + limit;
+            ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
+            return parseNoteList(resp.getBody());
+        } catch (Exception e) {
+            log.warn("调 content listNearby 失败: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
     public List<FeedItem> listByUser(Long userId, int page, int size) {
         try {
             String url = contentBaseUrl + "/api/note/user/" + userId + "?page=" + page + "&size=" + size;
@@ -130,8 +150,28 @@ public class ContentClient {
         item.setTitle(title != null ? String.valueOf(title) : null);
         Object cover = n.get("coverUrl");
         item.setCoverUrl(cover != null ? String.valueOf(cover) : null);
+        item.setMediaCount(asInt(n.get("mediaCount")));
+        Object kind = n.get("mediaKind");
+        item.setMediaKind(kind != null ? String.valueOf(kind) : null);
+        item.setLikeCount(asInt(n.get("likeCount")));
         item.setCreatedAt(asTime(n.get("createdAt")));
+        item.setLat(asDouble(n.get("lat")));
+        item.setLng(asDouble(n.get("lng")));
+        Object place = n.get("placeName");
+        item.setPlaceName(place != null ? String.valueOf(place) : null);
+        item.setDistanceKm(asDouble(n.get("distanceKm")));
         return item;
+    }
+
+    private static Double asDouble(Object v) {
+        if (v == null) return null;
+        if (v instanceof Double d) return d;
+        if (v instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(String.valueOf(v));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static LocalDateTime asTime(Object v) {

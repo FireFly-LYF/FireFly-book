@@ -1,9 +1,13 @@
 package contentservice.dto;
 
+import java.util.List;
+
 public class UpdateNoteRequest {
     private String title;
     private String content;
     private String coverUrl;
+    private List<String> mediaUrls;
+    private String mediaKind;
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
@@ -11,4 +15,8 @@ public class UpdateNoteRequest {
     public void setContent(String content) { this.content = content; }
     public String getCoverUrl() { return coverUrl; }
     public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
+    public List<String> getMediaUrls() { return mediaUrls; }
+    public void setMediaUrls(List<String> mediaUrls) { this.mediaUrls = mediaUrls; }
+    public String getMediaKind() { return mediaKind; }
+    public void setMediaKind(String mediaKind) { this.mediaKind = mediaKind; }
 }

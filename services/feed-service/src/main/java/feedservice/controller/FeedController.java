@@ -36,4 +36,14 @@ public class FeedController {
     public ApiResponse<List<FeedItem>> discover(@RequestParam(defaultValue = "40") int size) {
         return ApiResponse.ok(feedService.discoverFeed(size));
     }
+
+    /** 附近流：按 lat/lng 距离排序（可不登录） */
+    @GetMapping("/nearby")
+    public ApiResponse<List<FeedItem>> nearby(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "8") double radiusKm,
+            @RequestParam(defaultValue = "40") int size) {
+        return ApiResponse.ok(feedService.nearbyFeed(lat, lng, radiusKm, size));
+    }
 }

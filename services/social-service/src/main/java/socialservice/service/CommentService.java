@@ -241,8 +241,9 @@ public class CommentService {
         if (preview != null && preview.length() > 50) {
             preview = preview.substring(0, 50) + "...";
         }
+        // refId 用 noteId，方便通知点击直达笔记（同人同笔记重复评论会幂等合并）
         NotifyEvent event = new NotifyEvent(
-                notifyUserId, fromUserId, "COMMENT", comment.getId(), prefix + preview);
+                notifyUserId, fromUserId, "COMMENT", comment.getNoteId(), prefix + preview);
         notifyEventPublisher.publish(MqConstants.RK_COMMENT_CREATED, event);
     }
 

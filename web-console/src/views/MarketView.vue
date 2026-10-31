@@ -7,15 +7,30 @@ import {
   newIdempotencyKey,
   toLocalMediaUrl,
 } from '../api'
+import { formatRelativeTime } from '../time'
 
 const props = defineProps({
   loggedIn: Boolean,
   userId: { type: [Number, null], default: null },
+  /** 从消息等入口跳入：browse | cart | orders | sell */
+  initialTab: { type: [String, null], default: null },
 })
-const emit = defineEmits(['need-login', 'toast', 'open-profile'])
+const emit = defineEmits(['need-login', 'toast', 'open-profile', 'section-opened'])
 
 /** browse | cart | orders | sell */
 const tab = ref('browse')
+
+watch(
+  () => props.initialTab,
+  (v) => {
+    if (!v) return
+    if (['browse', 'cart', 'orders', 'sell'].includes(v)) {
+      tab.value = v
+      emit('section-opened')
+    }
+  },
+  { immediate: true },
+)
 const loading = ref(false)
 const busy = ref(false)
 
@@ -113,15 +128,7 @@ function statusClass(status) {
 }
 
 function formatTime(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${y}-${m}-${day} ${h}:${min}`
+  return formatRelativeTime(iso) || ''
 }
 
 function parseAddressObj(snapshot) {
@@ -513,7 +520,7 @@ function openAddressManage() {
           购物车<span v-if="cartCount" class="badge">{{ cartCount }}</span>
         </button>
         <button type="button" :class="{ on: tab === 'orders' }" @click="tab = 'orders'">订单</button>
-        <button type="button" :class="{ on: tab === 'sell' }" @click="tab = 'sell'">卖家</button>
+        <button type="button" :class="{ on: tab === 'sell' }" @click="tab = 'sell'">我卖的</button>
       </nav>
     </header>
 
@@ -552,7 +559,7 @@ function openAddressManage() {
             <SignedImg v-if="c.coverUrl" class="thumb lg" :src="c.coverUrl" alt="" />
             <div v-else class="thumb lg ph" />
             <div class="cart-meta">
-              <strong class="clamp2">{{ c.title || `商品#${c.productId}` }}</strong>
+              <strong class="clamp2">{{ c.title || '商品' }}</strong>
               <div class="cart-foot">
                 <span class="price">¥{{ yuan(c.priceCents) }}</span>
                 <div class="qty">
@@ -610,7 +617,7 @@ function openAddressManage() {
           <li v-for="o in currentOrders" :key="o.id" class="ocard">
             <div class="oh">
               <div class="oh-left">
-                <span class="oid">订单 #{{ o.id }}</span>
+                <span class="oid">订单 · {{ formatTime(o.createdAt) || o.id }}</span>
                 <span v-if="o.createdAt" class="otime">{{ formatTime(o.createdAt) }}</span>
               </div>
               <em class="status-pill" :class="statusClass(o.status)">
@@ -649,7 +656,7 @@ function openAddressManage() {
                   :disabled="busy"
                   @click="actOrder(() => marketApi().pay(o.id), '支付成功')"
                 >
-                  模拟支付
+                  立即支付
                 </button>
                 <button
                   v-if="o.status === 'CREATED'"
@@ -842,6 +849,7 @@ function openAddressManage() {
           <button type="button" class="x" aria-label="关闭" @click="checkoutOpen = false">×</button>
         </div>
         <div class="sheet-bd">
+          <p class="ck-steps">确认商品与收货地址后提交订单</p>
           <div v-for="i in checkoutItems" :key="i.productId" class="ck-line">
             <SignedImg v-if="i.coverUrl" class="thumb" :src="i.coverUrl" alt="" />
             <div v-else class="thumb ph" />
@@ -1040,17 +1048,13 @@ function openAddressManage() {
 
 .sku-img,
 .ph {
-  height: 140px;
+  aspect-ratio: 1;
+  height: auto;
+  min-height: 140px;
 }
 
 .ph {
-  background: repeating-linear-gradient(
-    -45deg,
-    #f3f3f3,
-    #f3f3f3 8px,
-    #ececec 8px,
-    #ececec 16px
-  );
+  background: linear-gradient(145deg, #ffe8ec 0%, #f5f5f5 55%, #eee 100%);
 }
 
 .ph.tall {
@@ -1781,6 +1785,15 @@ function openAddressManage() {
 .ck-sub .price {
   margin: 0;
   font-size: 0.88rem;
+}
+
+.ck-steps {
+  margin: 0 0 0.75rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  background: #fff5f7;
+  color: var(--ink-2);
+  font-size: 0.78rem;
 }
 
 .ck-total {

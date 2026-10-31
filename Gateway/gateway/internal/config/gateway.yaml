@@ -132,6 +132,11 @@ routes:
     upstreams:
       - http: http://127.0.0.1:9008
         weight: 1
+  - id: im
+    prefix: /api/im
+    upstreams:
+      - http: http://127.0.0.1:9009
+        weight: 1
   - id: ai-assistant
     prefix: /api/ai
     upstreams:

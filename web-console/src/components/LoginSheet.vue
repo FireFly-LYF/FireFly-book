@@ -6,11 +6,17 @@ defineProps({ open: Boolean })
 const emit = defineEmits(['close', 'success'])
 
 const mode = ref('login')
-const form = ref({ username: '', password: '123456', nickname: '' })
+const form = ref({ username: '', password: '', nickname: '' })
 const err = ref('')
 const loading = ref(false)
 /** 仅当按下与抬起都在遮罩上时才关闭，避免输入框拖选文字时误关 */
 const closeOnMaskUp = ref(false)
+
+function fillDemo() {
+  mode.value = 'login'
+  form.value = { username: 'test', password: 'test', nickname: '' }
+  err.value = ''
+}
 
 function onMaskPointerDown(e) {
   closeOnMaskUp.value = e.target === e.currentTarget
@@ -42,12 +48,12 @@ async function submit() {
       return
     }
     if (!res.body?.data?.user || !(res.body.data.accessToken || res.body.data.token)) {
-      err.value = '未返回双令牌，请确认已建 refresh_token 表并重启 user-service'
+      err.value = '登录异常，请稍后重试'
       return
     }
     emit('success', res.body.data)
   } catch (e) {
-    err.value = String(e?.message || e)
+    err.value = '网络异常，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -84,6 +90,9 @@ async function submit() {
           {{ loading ? '提交中…' : mode === 'login' ? '登录' : '注册并登录' }}
         </button>
       </form>
+      <button v-if="mode === 'login'" type="button" class="demo" @click="fillDemo">
+        使用演示账号
+      </button>
       <button type="button" class="switch" @click="mode = mode === 'login' ? 'register' : 'login'">
         {{ mode === 'login' ? '没有账号？去注册' : '已有账号？去登录' }}
       </button>
@@ -162,9 +171,20 @@ label {
 
 .primary:disabled { opacity: 0.5; transform: none; }
 
+.demo {
+  width: 100%;
+  margin-top: 0.65rem;
+  padding: 0.55rem;
+  border-radius: 18px;
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .switch {
   width: 100%;
-  margin-top: 0.7rem;
+  margin-top: 0.55rem;
   color: var(--ink-2);
   font-size: 0.85rem;
 }

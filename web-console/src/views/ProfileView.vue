@@ -15,6 +15,7 @@ const emit = defineEmits([
   'logout',
   'open-note',
   'open-profile',
+  'open-dm',
   'back',
   'toast',
   'profile-updated',
@@ -42,6 +43,7 @@ const authorAvatars = ref({})
 const followers = ref([])
 const following = ref([])
 const followedByMe = ref(false)
+const receivedLikes = ref(0)
 const loading = ref(false)
 const tab = ref('notes')
 const listTab = ref(null) // null | followers | following
@@ -71,6 +73,7 @@ function reset() {
   followers.value = []
   following.value = []
   followedByMe.value = false
+  receivedLikes.value = 0
   listTab.value = null
   tab.value = 'notes'
 }
@@ -101,10 +104,11 @@ async function refresh() {
       profile.value = u.body.data
     }
 
-    const [n, fr, fg] = await Promise.all([
+    const [n, fr, fg, st] = await Promise.all([
       noteApi().listByUser(uid, 1, 50),
       userApi().followers(uid),
       userApi().following(uid),
+      noteApi().statsByUser(uid),
     ])
     if (n.body?.code === 0) notes.value = n.body.data || []
     else notes.value = []
@@ -112,6 +116,14 @@ async function refresh() {
     else followers.value = []
     if (fg.body?.code === 0) following.value = fg.body.data || []
     else following.value = []
+    if (st.body?.code === 0) {
+      receivedLikes.value = Number(st.body.data?.likeCount) || 0
+    } else {
+      receivedLikes.value = notes.value.reduce(
+        (s, note) => s + (Number(note.likeCount) || 0),
+        0,
+      )
+    }
 
     if (me.value?.id && !isSelf.value) {
       const mine = await userApi().following(me.value.id)
@@ -232,6 +244,14 @@ async function toggleFollow() {
   }
 }
 
+function startDm() {
+  if (!me.value) return emit('need-login')
+  if (isSelf.value) return
+  const id = targetId.value
+  if (!id) return
+  emit('open-dm', Number(id))
+}
+
 function openUser(uid) {
   if (!uid) return
   if (Number(uid) === Number(targetId.value)) {
@@ -324,22 +344,24 @@ const displayName = computed(
             <button type="button" @click="listTab = null; tab = 'notes'">
               <b>{{ notes.length }}</b><span>笔记</span>
             </button>
+            <button type="button" @click="listTab = null; tab = 'notes'">
+              <b>{{ receivedLikes }}</b><span>获赞</span>
+            </button>
             <button type="button" @click="listTab = 'followers'">
               <b>{{ followers.length }}</b><span>粉丝</span>
             </button>
-            <button type="button" @click="listTab = 'following'">
-              <b>{{ following.length }}</b><span>关注</span>
-            </button>
-            <div class="todo"><b>—</b><span>获赞</span></div>
           </div>
         </div>
         <h1>{{ displayName }}</h1>
-        <p class="bio">{{ profile.bio || '这个人很懒，还没有简介' }}</p>
-        <p class="uid">uid {{ profile.id }} · @{{ profile.username }}</p>
+        <p class="bio">{{ profile.bio || '还没有简介' }}</p>
+        <p v-if="profile.username" class="uid">@{{ profile.username }}</p>
         <div class="actions">
           <template v-if="isSelf">
             <button type="button" class="edit" @click="openEdit">编辑资料</button>
-            <button type="button" class="out" @click="$emit('logout')">退出登录</button>
+            <button type="button" class="out ghost" @click="listTab = 'following'">
+              关注 {{ following.length }}
+            </button>
+            <button type="button" class="out ghost" @click="$emit('logout')">退出</button>
           </template>
           <template v-else>
             <button
@@ -350,6 +372,7 @@ const displayName = computed(
             >
               {{ followedByMe ? '已关注' : '关注' }}
             </button>
+            <button type="button" class="dm" @click="startDm">私信</button>
           </template>
         </div>
       </header>
@@ -373,7 +396,7 @@ const displayName = computed(
               <UserAvatar :user="u" :name="u.nickname || u.username" :size="42" />
               <span class="pinfo">
                 <strong>{{ u.nickname || u.username }}</strong>
-                <em>@{{ u.username }} · id {{ u.id }}</em>
+                <em>@{{ u.username }}</em>
               </span>
             </button>
           </li>
@@ -611,7 +634,7 @@ const displayName = computed(
 .stats {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   text-align: center;
   gap: 0.2rem;
 }
@@ -641,6 +664,17 @@ h1 {
   margin-top: 0.8rem;
 }
 
+.dm {
+  flex: 1;
+  padding: 0.55rem 0;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
 .edit, .out, .follow {
   flex: 1;
   padding: 0.5rem;
@@ -662,6 +696,12 @@ h1 {
 }
 
 .out { color: var(--ink-2); }
+.out.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  font-weight: 500;
+  color: var(--ink-3);
+}
 
 .follow {
   background: var(--xhs-red);

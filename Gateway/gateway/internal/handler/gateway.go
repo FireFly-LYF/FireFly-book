@@ -56,13 +56,17 @@ func (g *Gateway) Register(r *gin.Engine) {
 		"POST /api/user/login":          {},
 		"POST /api/user/refresh":        {},
 		"GET /api/feed/discover":        {},
+		"GET /api/feed/nearby":          {},
 		"GET /api/note/discover":        {},
+		"GET /api/note/nearby":          {},
 		"GET /api/note/*":               {}, // 笔记详情
 		"GET /api/note/user/*":          {}, // 用户笔记墙
 		"GET /api/user/*":               {}, // 用户资料（含 /me，无 Token 时下游自行处理）
 		"POST /api/media/sign":          {}, // 封面/详情图签名（UUID 路径，枚举成本高）
 		"GET /api/social/like/*/count":  {},
 		"GET /api/social/comment/*":     {},
+		"GET /api/search/note":          {}, // 游客可搜笔记
+		"GET /api/search/user":          {}, // 游客可搜用户
 	}
 	var apiAuth gin.HandlerFunc
 	if g.cfg.APIAuthRequired() {

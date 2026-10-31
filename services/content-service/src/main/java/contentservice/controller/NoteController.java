@@ -43,6 +43,20 @@ public class NoteController {
         return ApiResponse.ok(noteService.listDiscover(size));
     }
 
+    /** 附近流：按 lat/lng 距离排序（可不登录） */
+    @GetMapping("/nearby")
+    public ApiResponse<List<Note>> nearby(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "8") double radiusKm,
+            @RequestParam(defaultValue = "40") int size) {
+        try {
+            return ApiResponse.ok(noteService.listNearby(lat, lng, radiusKm, size));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.fail(40001, e.getMessage());
+        }
+    }
+
     /** 写在 /{id} 前面，避免被当成 id */
     @GetMapping("/user/{userId}")
     public ApiResponse<List<Note>> listByUser(
@@ -51,6 +65,12 @@ public class NoteController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.ok(noteService.listByUser(userId, page, size, viewerUserId));
+    }
+
+    /** 个人页统计：笔记数 + 获赞（like_count 汇总） */
+    @GetMapping("/user/{userId}/stats")
+    public ApiResponse<java.util.Map<String, Long>> statsByUser(@PathVariable Long userId) {
+        return ApiResponse.ok(noteService.statsByUser(userId));
     }
 
     /** Feed 读扩散：一次拉取多位作者最新笔记（userIds≤100） */

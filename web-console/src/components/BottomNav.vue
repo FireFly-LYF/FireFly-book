@@ -6,7 +6,7 @@ defineProps({
 defineEmits(['change'])
 
 const items = [
-  { id: 'home', label: '首页' },
+  { id: 'home', label: '发现' },
   { id: 'market', label: '市集' },
   { id: 'publish', label: '发布', center: true },
   { id: 'msg', label: '消息' },

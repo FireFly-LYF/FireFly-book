@@ -20,6 +20,7 @@ $ComposeFile = Join-Path $RepoRoot 'deploy\docker-compose.yml'
 $EnvFile = Join-Path $RepoRoot '.env'
 $StopAll = Join-Path $RepoRoot 'stop-all.ps1'
 $SchemaSql = Join-Path $RepoRoot 'services\market-service\schema.sql'
+$ImSchemaSql = Join-Path $RepoRoot 'services\im-service\schema.sql'
 
 Set-Location $RepoRoot
 
@@ -95,8 +96,35 @@ if (Test-Path -LiteralPath $SchemaSql) {
   if ($LASTEXITCODE -ne 0) { throw 'apply market schema.sql failed' }
 }
 
+Write-Host '==> Ensure im database + schema' -ForegroundColor Cyan
+& docker exec -i firefly-mysql-1 mysql -uroot "-p$($env:MYSQL_PASSWORD)" -e "CREATE DATABASE IF NOT EXISTS ``im`` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+if ($LASTEXITCODE -ne 0) { throw 'CREATE DATABASE im failed' }
+if (Test-Path -LiteralPath $ImSchemaSql) {
+  Get-Content -LiteralPath $ImSchemaSql -Raw | & docker exec -i firefly-mysql-1 mysql -uroot "-p$($env:MYSQL_PASSWORD)"
+  if ($LASTEXITCODE -ne 0) { throw 'apply im schema.sql failed' }
+}
+
+$SyncToDocker = Join-Path $PSScriptRoot 'sync-media-to-docker.ps1'
+if (Test-Path -LiteralPath $SyncToDocker) {
+  Write-Host '==> Sync local media into Docker volume (covers / uploads)' -ForegroundColor Cyan
+  & $SyncToDocker
+}
+
+$ReindexEs = Join-Path $PSScriptRoot 'reindex-es.ps1'
+if (Test-Path -LiteralPath $ReindexEs) {
+  Write-Host '==> Wait for search-service then reindex ES' -ForegroundColor Cyan
+  $deadline = (Get-Date).AddMinutes(2)
+  do {
+    try {
+      $hc = Invoke-WebRequest -Uri 'http://127.0.0.1:9007/actuator/health' -UseBasicParsing -TimeoutSec 2
+      if ($hc.StatusCode -eq 200) { break }
+    } catch { Start-Sleep -Seconds 2 }
+  } while ((Get-Date) -lt $deadline)
+  & $ReindexEs
+}
+
 Write-Host ''
 Write-Host 'Redeploy done.' -ForegroundColor Green
-Write-Host '  Gateway health: http://localhost:8080/gateway/health'
-Write-Host '  Frontend (local): cd web-console; npm run dev'
-Write-Host '  Seed market: .\deploy\scripts\seed-market.ps1'
+Write-Host '  Frontend:        http://localhost:5173/'
+Write-Host '  Gateway health:  http://localhost:8080/gateway/health'
+Write-Host '  Seed market:     .\deploy\scripts\seed-market.ps1'

@@ -10,6 +10,7 @@ import MessageView from './views/MessageView.vue'
 import ProfileView from './views/ProfileView.vue'
 import PublishView from './views/PublishView.vue'
 import SearchView from './views/SearchView.vue'
+import TopicView from './views/TopicView.vue'
 import { loadAuthSession, saveAuthSession, normalizeAuthPayload, userApi } from './api'
 
 
@@ -19,6 +20,9 @@ const session = ref(loadAuthSession())
 const loginOpen = ref(false)
 const detailId = ref(null)
 const viewingUserId = ref(null)
+const dmPeerId = ref(null)
+const marketSection = ref(null)
+const topicName = ref('')
 const unread = ref(0)
 const toast = ref('')
 let toastTimer = null
@@ -72,12 +76,24 @@ async function logout() {
 
 function onNav(id) {
   showSearch.value = false
+  topicName.value = ''
   if (id === 'me') viewingUserId.value = null
   tab.value = id
 }
 
 function openNote(id) {
   detailId.value = id
+}
+
+function openTopic(name) {
+  if (!name) return
+  topicName.value = String(name)
+  showSearch.value = false
+  detailId.value = null
+}
+
+function closeTopic() {
+  topicName.value = ''
 }
 
 function openProfile(uid) {
@@ -88,6 +104,30 @@ function openProfile(uid) {
   detailId.value = null
   viewingUserId.value = id
   tab.value = 'me'
+}
+
+function openDm(uid) {
+  if (!uid) return
+  const id = Number(uid)
+  if (!id) return
+  if (!loggedIn.value) return needLogin()
+  showSearch.value = false
+  detailId.value = null
+  viewingUserId.value = null
+  dmPeerId.value = id
+  tab.value = 'msg'
+}
+
+function clearDmPeer() {
+  dmPeerId.value = null
+}
+
+function openMarket(section) {
+  showSearch.value = false
+  detailId.value = null
+  viewingUserId.value = null
+  marketSection.value = section || 'browse'
+  tab.value = 'market'
 }
 
 function backFromProfile() {
@@ -135,8 +175,17 @@ function onProfileUpdated(user) {
     <div class="shell">
       <main class="main">
         <Transition name="page" mode="out-in">
+          <TopicView
+            v-if="topicName"
+            key="topic"
+            :topic="topicName"
+            @back="closeTopic"
+            @open-note="openNote"
+            @open-profile="openProfile"
+            @toast="showToast"
+          />
           <SearchView
-            v-if="showSearch"
+            v-else-if="showSearch"
             key="search"
             :logged-in="loggedIn"
             @back="showSearch = false"
@@ -160,9 +209,11 @@ function onProfileUpdated(user) {
             key="market"
             :logged-in="loggedIn"
             :user-id="userId"
+            :initial-tab="marketSection"
             @need-login="needLogin"
             @toast="showToast"
             @open-profile="openProfile"
+            @section-opened="marketSection = null"
           />
           <PublishView
             v-else-if="tab === 'publish'"
@@ -177,10 +228,14 @@ function onProfileUpdated(user) {
             key="msg"
             :logged-in="loggedIn"
             :user-id="userId"
+            :open-peer-id="dmPeerId"
             @need-login="needLogin"
             @toast="showToast"
             @unread="setUnread"
             @open-profile="openProfile"
+            @open-note="openNote"
+            @open-market="openMarket"
+            @peer-opened="clearDmPeer"
           />
           <ProfileView
             v-else
@@ -191,6 +246,7 @@ function onProfileUpdated(user) {
             @logout="logout"
             @open-note="openNote"
             @open-profile="openProfile"
+            @open-dm="openDm"
             @back="backFromProfile"
             @toast="showToast"
             @profile-updated="onProfileUpdated"
@@ -201,7 +257,7 @@ function onProfileUpdated(user) {
 
     <BottomNav
       class="mobile-only"
-      v-show="!showSearch && !detailId"
+      v-show="!showSearch && !detailId && !topicName"
       :active="tab"
       :unread="unread"
       @change="onNav"
@@ -216,6 +272,8 @@ function onProfileUpdated(user) {
       @need-login="needLogin"
       @toast="showToast"
       @open-profile="openProfile"
+      @open-topic="openTopic"
+      @deleted="detailId = null"
     />
 
     <LoginSheet
