@@ -3,6 +3,74 @@
 仿小红书风格的内容社区：注册登录、发笔记（图文）、赞评藏、关注流、通知、搜索，以及可选的内容审核与 AI 搜索助手。  
 技术栈为 Go 网关 + Java 微服务 + Vue 前端，配套 MySQL / Redis / RabbitMQ / Elasticsearch；支持本机一键启动与 Docker Compose 部署。
 
+演示账号：**test / test**（昵称「小火」）。截图见 [`docs/showcase-screenshots/`](./docs/showcase-screenshots/)。
+
+---
+
+## 界面展示
+
+按「逛内容 → 互动 → 市集下单 → 卖家上架」顺序：
+
+### 1. 发现流
+
+瀑布流浏览笔记，支持关注 / 发现 / 附近。
+
+<img src="./docs/showcase-screenshots/01-home-discover.png" alt="发现流" width="900" />
+
+### 2. 笔记详情
+
+图文详情、关注作者、点赞收藏与楼中楼评论。
+
+<img src="./docs/showcase-screenshots/02-note-detail.png" alt="笔记详情" width="900" />
+
+### 3. 个人主页
+
+资料、笔记 / 在售 / 收藏 / 赞过。
+
+<img src="./docs/showcase-screenshots/03-profile.png" alt="个人主页" width="900" />
+
+### 4. 互动消息
+
+赞藏、关注、评论与 @ 通知。
+
+<img src="./docs/showcase-screenshots/04-notifications-comments.png" alt="互动消息" width="700" />
+
+### 5. 市集
+
+二手商品浏览与分类筛选。
+
+<img src="./docs/showcase-screenshots/05-market.png" alt="市集" width="900" />
+
+### 6. 商品详情
+
+价格、成色、卖家与加购 / 立即购买。
+
+<img src="./docs/showcase-screenshots/06-product-detail.png" alt="商品详情" width="900" />
+
+### 7. 商品评价
+
+评价标签与买家反馈。
+
+<img src="./docs/showcase-screenshots/07-product-reviews.png" alt="商品评价" width="700" />
+
+### 8. 确认订单
+
+选地址、核对商品与金额。
+
+<img src="./docs/showcase-screenshots/08-order-confirm.png" alt="确认订单" width="700" />
+
+### 9. 收银台
+
+沙箱扫码支付（FireFly Pay），倒计时关单。
+
+<img src="./docs/showcase-screenshots/09-cashier-pay.png" alt="收银台" width="560" />
+
+### 10. 上架商品
+
+卖家填写品类、成色、价格并上传封面。
+
+<img src="./docs/showcase-screenshots/10-sell-product.png" alt="上架商品" width="700" />
+
 ---
 
 ## 架构
@@ -31,7 +99,7 @@ note.created → moderation :9101 → 回写 status → note.published → feed 
 | notify-service | 9005 | 通知 |
 | feed-service | 9006 | 关注流写扩散 |
 | search-service | 9007 | ES 搜索 |
-| market-service | 9008 | 市集：商品/购物车/地址/订单/模拟支付/售后 |
+| market-service | 9008 | 市集：商品/购物车/地址/订单/沙箱扫码支付/售后 |
 | moderation-service | 9101 | 先审后发（文本 + NSFW HTTP） |
 | assistant-service | 9102 | AI 搜索（引用 + Web 过滤） |
 | Gateway | 8080 | 统一入口 |
@@ -50,7 +118,7 @@ note.created → moderation :9101 → 回写 status → note.published → feed 
 | 通知 | 列表/已读、写侧幂等 |
 | 信息流 | `GET /api/feed/following` |
 | 搜索 | ES + IK；可选 AI 问答与引用 |
-| 市集 | 商品上架/浏览、购物车、地址、下单扣库存、模拟支付、取消/售后（web-console 已接线） |
+| 市集 | 商品上架/浏览、购物车、地址、下单扣库存、沙箱扫码支付（预下单/回调入账/超时关单/退款事务）、取消/售后（web-console 已接线） |
 | 网关 | JWT、白名单 CORS、限流、熔断、媒体签名 |
 | 缓存 | Redis L2 + Caffeine L1（详情/点赞计数/通知等，可开关） |
 | 可观测 | Actuator、RequestId |
@@ -110,7 +178,7 @@ docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
 前端已含在 Compose：http://localhost:5173/（Docker Desktop 点 `5173` 即可）。本机热更新仍可用：`cd web-console; npm run dev`。
 
 造数：`.\deploy\scripts\seed-notes.ps1`（可选 `-NoCovers`）；评论（含楼中楼）：`.\deploy\scripts\seed-comments.ps1`；市集：`.\deploy\scripts\seed-market.ps1`。种子账号如 `seed_momo` / `123456`。  
-演示账号：`.\deploy\scripts\seed-demo-test.ps1` → **test / test**（关注种子作者、笔记、赞藏、南京收货地址）。需笔记已过审后发现流才有内容。  
+小火账号：`.\deploy\scripts\seed-demo-test.ps1` → **test / test**（昵称小火；笔记、赞藏、评论/关注通知、多段私信、南京收货地址）。需笔记已过审后发现流才有内容。  
 本机造数后封面在 `MEDIA_STORAGE_DIR`，进 Docker 需同步：`.\deploy\scripts\sync-media-to-docker.ps1`（`redeploy.ps1` 会自动做）。
 
 ### 4. AI（审核 / 搜索助手）
@@ -164,6 +232,7 @@ RabbitMQ：http://localhost:15672（`guest` / `.env` 中 `RABBITMQ_PASSWORD`）�
 
 | 文档 | 说明 |
 |------|------|
+| [`docs/showcase-screenshots/`](./docs/showcase-screenshots/) | 界面展示截图 |
 | [`issue.md`](./issue.md) | 上线风险与修复进度（必读） |
 | [`services-ai/README.md`](./services-ai/README.md) | AI 启动与接线 |
 | [`bench/README.md`](./bench/README.md) | 压测脚本与归档报告 |
